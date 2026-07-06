@@ -84,6 +84,9 @@ class CElectricalApp : public AcRxArxApp {
 public:
     CElectricalApp() : AcRxArxApp() {}
 
+    // Required pure-virtual override (BRX/ARX on Linux needs this).
+    void RegisterServerComponents() override {}
+
     virtual AcRx::AppRetCode On_kInitAppMsg(void* pkt) override {
         AcRx::AppRetCode rc = AcRxArxApp::On_kInitAppMsg(pkt);
 

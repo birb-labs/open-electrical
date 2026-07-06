@@ -46,6 +46,21 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+# ---- Pre-flight checks ----------------------------------------------------
+$cmakePath = Get-Command cmake -ErrorAction SilentlyContinue
+if (-not $cmakePath) {
+    Write-Host "[setup.ps1] ✘ CMake is not installed or not on PATH." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "  Install CMake ≥ 3.20 from: https://cmake.org/download/"
+    Write-Host "  Or via Chocolatey: choco install cmake"
+    Write-Host "  Or via winget:      winget install Kitware.CMake"
+    Write-Host ""
+    throw "CMake not found. Aborting."
+}
+
+$cmakeVersion = & cmake --version | Select-Object -First 1
+Write-Host "[setup.ps1] CMake version : $cmakeVersion"
+
 # ---- Resolve paths --------------------------------------------------------
 $ScriptPath = Split-Path -Path $PSCommandPath -Parent
 $ProjectDir = Split-Path -Path $ScriptPath -Parent

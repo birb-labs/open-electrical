@@ -60,7 +60,20 @@ find_package_handle_standard_args(BRX
 The SDK is obtained from Bricsys after registering as an ARX/BRX/TX developer.")
 
 if(BRX_FOUND)
+    # On Linux the BRX SDK provides a "Windows Platform Emulation" layer that
+    # supplies <windows.h> and the non-GUI MFC classes (CString, CArray, ...)
+    # needed by the SDK headers.  We must add the Platform substitutes dir to
+    # the include path so that #include <windows.h> resolves there instead of
+    # the (non-existent) system header.
     set(BRX_INCLUDE_DIRS "${BRX_INCLUDE_DIR}")
+    if(NOT WIN32)
+        set(_brx_platform_subst "${BRX_INCLUDE_DIR}/Platform/substitutes")
+        if(IS_DIRECTORY "${_brx_platform_subst}")
+            list(APPEND BRX_INCLUDE_DIRS "${_brx_platform_subst}")
+            message(STATUS "BRX Platform substitutes: ${_brx_platform_subst}")
+        endif()
+    endif()
+
     if(NOT TARGET BRX::BRX)
         add_library(BRX::BRX INTERFACE IMPORTED)
         set_target_properties(BRX::BRX PROPERTIES

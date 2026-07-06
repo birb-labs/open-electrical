@@ -18,11 +18,37 @@ PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_DIR"
 
 # ---------------------------------------------------------------------------
+#  Pre-flight checks
+# ---------------------------------------------------------------------------
+command -v cmake >/dev/null 2>&1 || {
+    echo "[setup.sh] ✘ cmake is not installed or not on PATH."
+    echo ""
+    echo "  Install it with your package manager, e.g.:"
+    echo "    Debian/Ubuntu : sudo apt install cmake"
+    echo "    Fedora        : sudo dnf install cmake"
+    echo "    Arch Linux    : sudo pacman -S cmake"
+    echo "    openSUSE      : sudo zypper install cmake"
+    echo ""
+    echo "  Minimum required version: 3.20"
+    exit 1
+}
+
+CMAKE_VERSION=$(cmake --version | head -1 | grep -oP '\d+\.\d+' | head -1)
+echo "[setup.sh] cmake version : ${CMAKE_VERSION}"
+
+# Auto-detect generator: prefer Ninja, fallback to Unix Makefiles.
+if command -v ninja >/dev/null 2>&1; then
+    CMAKE_GENERATOR="${CMAKE_GENERATOR:-Ninja}"
+else
+    echo "[setup.sh] ⚠ ninja not found — using 'Unix Makefiles'"
+    CMAKE_GENERATOR="${CMAKE_GENERATOR:-Unix Makefiles}"
+fi
+
+# ---------------------------------------------------------------------------
 #  Configurable variables  (override via environment)
 # ---------------------------------------------------------------------------
 BUILD_DIR="${BUILD_DIR:-${PROJECT_DIR}/build}"
 INSTALL_DIR="${INSTALL_DIR:-${HOME}/.local/share/BricsCAD/V26x64/BricsCAD.Electrical}"
-CMAKE_GENERATOR="${CMAKE_GENERATOR:-Ninja}"
 BUILD_TYPE="${BUILD_TYPE:-Release}"
 PARALLEL="${PARALLEL:-$(nproc)}"
 

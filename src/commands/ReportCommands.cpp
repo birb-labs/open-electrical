@@ -6,6 +6,7 @@
 #include "services/ProjectContext.h"
 #include "services/ReportGenerator.h"
 #include "ui/Localization.h"
+#include "utilities/GeometryHelper.h"
 #include "utilities/StringUtil.h"
 #include "utilities/TransactionHelper.h"
 

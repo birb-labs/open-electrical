@@ -33,7 +33,11 @@ bool ensureWxInitialized() {
             return false;
 #endif
     }
-    if (wxTheApp && !wxTheApp->IsInitialized())
+    // In wxWidgets 3.2, after wxEntryStart the wxApp is already initialised;
+    // CallOnInit is safe to call (it checks internally). We guard by checking
+    // whether the main loop was already entered (OnRun), which for BricsCAD
+    // is always true, so we simply ensure OnInit was called.
+    if (wxTheApp && !wxTheApp->GetMainLoop())
         wxTheApp->CallOnInit();
     g_wxReady = true;
     return true;

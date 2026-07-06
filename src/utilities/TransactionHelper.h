@@ -29,13 +29,21 @@ public:
     Transaction();
     ~Transaction();
 
+#if defined(_ELECTRICAL_WIN)
     AcDbTransaction* raw() const { return tr_; }
+#else
+    AcTransaction* raw() const { return tr_; }
+#endif
     void abort() { abort_ = true; }
     void commit();   // explicit early commit
 
 private:
     AcTransactionManager* mgr_ = nullptr;
+#if defined(_ELECTRICAL_WIN)
     AcDbTransaction*      tr_   = nullptr;
+#else
+    AcTransaction*        tr_   = nullptr;
+#endif
     bool committed_ = false;
     bool abort_     = false;
 };
