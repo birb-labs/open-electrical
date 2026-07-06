@@ -1,4 +1,5 @@
-```
+```gitignore
 # Scripts
-scripts/
+scripts/*.sh
+scripts/*.ps1
 ```
