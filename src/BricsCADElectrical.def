@@ -1,0 +1,7 @@
+; Module-definition file for the Windows (.brx) build.
+; BRX modules export their ARX entry points through the IMPLEMENT_ARX_ENTRYPOINT
+; macro; this .def keeps the required exports visible and the ordinals stable.
+LIBRARY "BricsCAD.Electrical"
+EXPORTS
+    acrxGetApiVersion       PRIVATE
+    acrxEntryPoint          PRIVATE
