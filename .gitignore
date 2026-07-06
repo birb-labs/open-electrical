@@ -1,0 +1,68 @@
+# Build directories
+build/
+out/
+
+# Compiled objects and binaries
+*.o
+*.obj
+*.a
+*.lib
+*.so
+*.dll
+*.dylib
+*.exe
+*.brx
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+Makefile
+CTestTestfile.cmake
+compile_commands.json
+.ninja_deps
+.ninja_log
+build.ninja
+
+# IDE specific files
+.vscode/
+.idea/
+cmake-build-*/
+*.swp
+*.swo
+*~
+*.user
+*.suo
+*.filters
+*.sdf
+*.opensdf
+*.vcxproj.user
+*.pro.user
+*.pro.user.*
+
+# OS specific files
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs and temp files
+*.log
+*.tmp
+temp/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Scripts local overrides (not the scripts folder itself)
+scripts/*.local
+
+# Package managers (Conan / vcpkg)
+conanbuild.*
+conaninfo.*
+conanfile.py
+vcpkg.json
+vcpkg.lock
+vcpkg-manifest-install.log
+
