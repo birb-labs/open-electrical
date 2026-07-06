@@ -1,4 +1,4 @@
-# BricsCAD.Electrical
+# Open BricsCAD Electrical
 
 A cross-platform **BRX (C++) plugin** for BricsCAD V26 Ultimate that implements a
 complete **low-voltage electrical installation design** workflow (similar in
