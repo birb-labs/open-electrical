@@ -66,8 +66,8 @@ BricsCAD.Electrical/
 ### 3.1 Common
 
 ```bash
-git clone <this repo>
-cd "BricsCAD.Electrical"
+git clone https://github.com/birb-labs/open-electrical.git
+cd "open-electrical"
 ```
 
 Point CMake at the BRX SDK with `-DBRX_SDK_ROOT=...`.
