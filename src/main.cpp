@@ -11,8 +11,10 @@
 #include "ui/Localization.h"
 #include "ui/UiBridge.h"
 #include "utilities/StringUtil.h"
+#include "utilities/Diag.h"
 
 #include <string>
+#include <cstdlib>
 
 #if defined(_ELECTRICAL_WIN)
   #include <windows.h>
@@ -55,12 +57,27 @@ std::string moduleDirectory() {
 #endif
 }
 
+// Fires during dlopen (static-initialisation phase). If oe-init.log contains
+// this line but not "kInit:enter", the fault is between load and app init.
+struct DiagStatic { DiagStatic() { EL_DIAG_LOG("STATIC-INIT ran (module dlopen'd)"); } };
+static DiagStatic g_diagStatic;
+
 // Document reactor: drop the cached project on any document switch so each
-// drawing gets its own state loaded lazily.
+// drawing gets its own state loaded lazily, and apply that drawing's saved UI
+// language (a document is active here, so touching its database is safe).
 class ElDocReactor : public AcApDocManagerReactor {
 public:
-    void documentActivated(AcApDocument*) override      { ProjectContext::instance().reload(); }
-    void documentToBeDestroyed(AcApDocument*) override   { ProjectContext::instance().reload(); }
+    void documentActivated(AcApDocument*) override {
+        EL_DIAG_LOG("reactor:documentActivated enter");
+        auto& ctx = ProjectContext::instance();
+        ctx.reload();
+        EL_DIAG_LOG("reactor: after reload, before project() load");
+        const auto& s = ctx.project().settings;
+        EL_DIAG_LOG("reactor: after project() load, before setLanguage");
+        Localization::instance().setLanguage(s.uiLanguage);
+        EL_DIAG_LOG("reactor: documentActivated done");
+    }
+    void documentToBeDestroyed(AcApDocument*) override { ProjectContext::instance().reload(); }
 };
 
 ElDocReactor* g_docReactor = nullptr;
@@ -88,27 +105,37 @@ public:
     void RegisterServerComponents() override {}
 
     virtual AcRx::AppRetCode On_kInitAppMsg(void* pkt) override {
+        EL_DIAG_LOG("kInit:enter");
         AcRx::AppRetCode rc = AcRxArxApp::On_kInitAppMsg(pkt);
+        EL_DIAG_LOG("kInit: after base On_kInitAppMsg");
 
         // Allow the module to be unloaded on demand.
         acrxUnlockApplication(pkt);
         acrxRegisterAppMDIAware(pkt);
+        EL_DIAG_LOG("kInit: after unlock + MDIAware");
 
-        // Localization: seed English (built-in) then load JSON packs.
-        Localization::instance().loadPacks(moduleDirectory() + "/resources");
-        // Apply the saved UI language of the current drawing, if any.
-        Localization::instance().setLanguage(
-            ProjectContext::instance().project().settings.uiLanguage);
+        // Localization: seed English (built-in) then load JSON packs. We do NOT
+        // touch the drawing database here - reading project data during module
+        // init is fragile (a document may not be fully available yet). The UI
+        // language defaults to English and is applied from the saved project on
+        // the first command / document activation (see the doc reactor).
+        const std::string resDir = moduleDirectory() + "/resources";
+        EL_DIAG_LOG("kInit: after moduleDirectory()");
+        Localization::instance().loadPacks(resDir);
+        EL_DIAG_LOG("kInit: after loadPacks");
 
         registerCommands();
+        EL_DIAG_LOG("kInit: after registerCommands");
 
         if (acDocManager) {
             g_docReactor = new ElDocReactor();
             acDocManager->addReactor(g_docReactor);
         }
+        EL_DIAG_LOG("kInit: after addReactor");
 
-        acutPrintf(_T("\nBricsCAD.Electrical loaded (%s). Type EL for the palette.\n"),
+        acutPrintf(_T("\nopen-electrical loaded (%s). Type EL for the palette.\n"),
                    EL_PLATFORM_NAME);
+        EL_DIAG_LOG("kInit: DONE (module fully loaded)");
         return rc;
     }
 

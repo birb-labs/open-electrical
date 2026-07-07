@@ -69,7 +69,7 @@ if (-not $BuildDir) {
     $BuildDir = Join-Path $ProjectDir "build"
 }
 if (-not $InstallDir) {
-    $InstallDir = Join-Path $env:LOCALAPPDATA "BricsCAD\V26x64\BricsCAD.Electrical"
+    $InstallDir = Join-Path $env:LOCALAPPDATA "open-electrical"
 }
 if ($Parallel -eq 0) {
     $Parallel = (Get-CimInstance Win32_ComputerSystem).NumberOfLogicalProcessors
@@ -82,13 +82,17 @@ Write-Host "[setup.ps1] Config       : $Config"
 Write-Host "[setup.ps1] Parallel     : $Parallel"
 
 # ---- Step 1 - Configure ---------------------------------------------------
+# BRX_SDK_ROOT / BRICSCAD_ROOT fall back to the CMake defaults when the
+# environment variables are not set; pass them through when they are.
 Write-Host "[setup.ps1] Configuring with CMake ..."
-& cmake -S $ProjectDir `
-        -B $BuildDir `
-        -G "Visual Studio 17 2022" `
-        -A x64 `
-        -T v143 `
-        -DCMAKE_BUILD_TYPE=$Config
+$cmakeArgs = @(
+    "-S", $ProjectDir, "-B", $BuildDir,
+    "-G", "Visual Studio 17 2022", "-A", "x64", "-T", "v143",
+    "-DCMAKE_BUILD_TYPE=$Config"
+)
+if ($env:BRX_SDK_ROOT)  { $cmakeArgs += "-DBRX_SDK_ROOT=$($env:BRX_SDK_ROOT)" }
+if ($env:BRICSCAD_ROOT) { $cmakeArgs += "-DBRICSCAD_ROOT=$($env:BRICSCAD_ROOT)" }
+& cmake @cmakeArgs
 
 if ($LASTEXITCODE -ne 0) {
     throw "[setup.ps1] CMake configuration failed."
@@ -110,12 +114,12 @@ if (-not (Test-Path $InstallDir)) {
 }
 
 # Copy the .brx itself (it sits inside a Release/Debug subfolder on MSVC).
-$BuiltBrx = Join-Path $BuildDir "${Config}\BricsCAD.Electrical.brx"
+$BuiltBrx = Join-Path $BuildDir "${Config}\open-electrical.brx"
 if (-not (Test-Path $BuiltBrx)) {
-    $BuiltBrx = Join-Path $BuildDir "BricsCAD.Electrical.brx"
+    $BuiltBrx = Join-Path $BuildDir "open-electrical.brx"
 }
 if (-not (Test-Path $BuiltBrx)) {
-    throw "[setup.ps1] BricsCAD.Electrical.brx not found under $BuildDir"
+    throw "[setup.ps1] open-electrical.brx not found under $BuildDir"
 }
 
 Copy-Item -Path $BuiltBrx -Destination $InstallDir -Force
@@ -126,5 +130,6 @@ if (Test-Path $BuiltResources) {
     Copy-Item -Path "$BuiltResources\*" -Destination $InstallDir\resources -Recurse -Force
 }
 
-Write-Host "[setup.ps1] ✓ Done — BricsCAD.Electrical installed."
+Write-Host "[setup.ps1] Done - open-electrical installed."
 Write-Host "[setup.ps1]   Bundle : $InstallDir"
+Write-Host "[setup.ps1]   Load in BricsCAD with APPLOAD -> open-electrical.brx, then type EL."

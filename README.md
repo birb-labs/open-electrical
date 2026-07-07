@@ -29,8 +29,15 @@ scope to PRO-Elétrica), following **ABNT NBR 5410** (installations) and
 | BricsCAD | V26 Ultimate (Pro+ required for compiled plugins) | V26 Ultimate |
 | Compiler | Visual Studio 2022, toolset **v143**, Windows SDK **10.0.19041.0** | GCC/Clang matching the host libstdc++ |
 | BRX SDK | **BRX SDK V26** (must match the BricsCAD major version) | **BRX SDK V26** (Linux) |
-| wxWidgets | 3.2.x (Unicode) | 3.2.x (Unicode) — the toolkit BricsCAD itself uses |
+| wxWidgets | 3.2.x (Unicode), linked **static** | built **static** by `scripts/build-wxstatic.sh` |
 | CMake | 3.20+ | 3.20+ |
+
+> **Why static wxWidgets?** BricsCAD loads its own wxWidgets (3.1 on Linux).
+> Linking the plugin against the system's *shared* wxWidgets puts two wx runtimes
+> in one process and **crashes BricsCAD on load**. The module therefore links a
+> private **static** wxWidgets and localises its symbols (`src/exports.map`), the
+> approach the BRX `brxWxSample` documents. `scripts/setup.sh` builds this static
+> wx automatically on first run.
 
 > The **BRX SDK is not redistributable**. Register at bricsys.com as an
 > *ARX/BRX/TX* developer; Bricsys grants the SDK download and a free developer
@@ -42,60 +49,75 @@ scope to PRO-Elétrica), following **ABNT NBR 5410** (installations) and
 ## 2. Project layout
 
 ```
-BricsCAD.Electrical/
+open-electrical/
 ├── CMakeLists.txt              # cross-platform build
-├── cmake/FindBRX.cmake         # locates the BRX SDK (BRX::BRX target)
+├── cmake/FindBRX.cmake         # locates BRX SDK + BricsCAD runtime (BRX::BRX)
+├── scripts/                    # setup.sh (Linux) / setup.ps1 (Windows)
 ├── src/
 │   ├── main.cpp                # BRX entry point, command registration
 │   ├── Platform.h              # the Win/Linux #ifdef seam
 │   ├── commands/               # EL- command handlers (+ Commands table)
 │   ├── models/                 # ProjectSettings, Room, elements, Circuit, Conduit
 │   ├── services/               # DatabaseService, LightingCalculator, distributor,
-│   │                           #   Router, ReportGenerator, ProjectContext
+│   │                           #   Router, ReportGenerator, SymbolFactory, ProjectContext
 │   ├── ui/                     # wxWidgets dialogs/palette + Localization + dcl/
 │   └── utilities/              # geometry, transactions, string conversion
 └── resources/
     ├── lang/                   # en.json, pt-BR.json, es.json
-    └── symbols/                # symbol-block naming guide (NBR 5444)
+    └── symbols/                # symbol notes (blocks are generated natively)
 ```
 
 ---
 
 ## 3. Building
 
-### 3.1 Common
+The build needs two roots (both auto-detected with the defaults below):
+
+- `BRX_SDK_ROOT`  — extracted BRX SDK V26 (headers). Default `/opt/brx_sdk_v26`.
+- `BRICSCAD_ROOT` — installed BricsCAD program folder, which ships the runtime
+  libraries and `libdrx_entrypoint.a`. Default `/opt/bricsys/bricscad/v26`.
+
+The module carries the platform's BRX extension: **`.brx` on Windows, `.lrx`
+(Linux Runtime eXtension) on Linux**.
+
+### 3.1 One-shot scripts (recommended)
 
 ```bash
-git clone https://github.com/birb-labs/open-electrical.git
-cd "open-electrical"
+# Linux — builds and installs to ~/.local/share/open-electrical
+./scripts/setup.sh
+
+# Windows (PowerShell) — builds and installs to %LOCALAPPDATA%\open-electrical
+.\scripts\setup.ps1
 ```
 
-Point CMake at the BRX SDK with `-DBRX_SDK_ROOT=...`.
+Override roots via environment variables, e.g.
+`BRX_SDK_ROOT=/opt/brx_sdk_v26 BRICSCAD_ROOT=/opt/bricsys/bricscad/v26 ./scripts/setup.sh`.
 
-### 3.2 Windows (MSVC)
+### 3.2 Manual — Windows (MSVC)
 
 ```bat
 cmake -S . -B build ^
   -G "Visual Studio 17 2022" -A x64 -T v143 ^
-  -DBRX_SDK_ROOT="C:/BRX_SDK_V26" ^
-  -DwxWidgets_ROOT_DIR="C:/wxWidgets-3.2"
+  -DBRX_SDK_ROOT="C:/BRX_SDK_V26"
 cmake --build build --config Release
 ```
 
-Output: `build/Release/BricsCAD.Electrical.brx`.
+Output: `build/Release/open-electrical.brx`.
 
-### 3.3 Linux (GCC/Clang)
+### 3.3 Manual — Linux (GCC/Clang)
 
 ```bash
 cmake -S . -B build \
   -DCMAKE_BUILD_TYPE=Release \
   -DBRX_SDK_ROOT=/opt/brx_sdk_v26 \
-  -DwxWidgets_CONFIG_EXECUTABLE=$(which wx-config)
+  -DBRICSCAD_ROOT=/opt/bricsys/bricscad/v26
 cmake --build build -j
 ```
 
-Output: `build/BricsCAD.Electrical.brx` (a shared object with the `.brx`
-extension). The `resources/` folder is copied next to the `.brx` automatically.
+Output: `build/open-electrical.lrx` (a shared object with the `.lrx` extension).
+The `resources/` folder is copied next to the module automatically. The build
+links `libdrx_entrypoint.a` whole-archive so the ARX entry points are re-exported
+and BricsCAD recognises the module.
 
 > **Toolchain matching matters.** On both platforms the plugin must share the
 > host's CRT/toolset. Do not mix Clang objects into a GCC-built BricsCAD host.
@@ -107,16 +129,16 @@ extension). The `resources/` folder is copied next to the `.brx` automatically.
 ### 4.1 Manual (APPLOAD)
 
 1. Start BricsCAD V26.
-2. Run `APPLOAD`.
-3. Browse to `BricsCAD.Electrical.brx` and **Load**.
-4. Keep `resources/` in the same folder as the `.brx` (localization + symbols).
-5. You should see: `BricsCAD.Electrical loaded (Windows|Linux). Type EL for the palette.`
+2. Run `APPLOAD` (or `(arxload "…/open-electrical.lrx")` on Linux).
+3. Browse to `open-electrical.lrx` (Linux) / `open-electrical.brx` (Windows) and **Load**.
+4. Keep `resources/` in the same folder as the module (localization packs).
+5. You should see: `open-electrical loaded (Windows|Linux). Type EL for the palette.`
 
 ### 4.2 Auto-load on startup (optional)
 
 Add the module to the demand-load registry (Windows) under
-`HKCU\Software\Bricsys\BricsCAD\V26x64\en_US\Applications\BricsCAD.Electrical`
-with `Loader` = full path to the `.brx` and `LoadCtrls` = `2` (load at startup),
+`HKCU\Software\Bricsys\BricsCAD\V26x64\en_US\Applications\open-electrical`
+with `Loader` = full path to the module and `LoadCtrls` = `2` (load at startup),
 or place a path line in an `autoload.rx` on the support path. See the BRX SDK's
 deployment docs for the exact registry layout.
 
@@ -174,9 +196,19 @@ names are English and prefixed `EL-`.
 
 ### 5.3 Symbols
 
-The plugin inserts block references named `EL_LIGHT`, `EL_OUTLET`, `EL_SWITCH`,
-`EL_PANEL`. If they are not defined in the drawing, a placeholder marker is drawn
-instead. See `resources/symbols/README.md` to define NBR 5444 symbols.
+The plugin **generates its NBR 5444 symbol blocks natively** the first time each
+is needed (`services/SymbolFactory`), so no external symbol library is required:
+
+| Block      | Element         | Glyph |
+|------------|-----------------|-------|
+| `EL_LIGHT` | Lighting point  | Circle with an inscribed cross |
+| `EL_OUTLET`| Socket outlet   | Half-disc on a base line with two contacts |
+| `EL_SWITCH`| Wall switch     | Small circle with an angled lever |
+| `EL_PANEL` | Load panel      | Labelled rectangle with a diagonal |
+
+To use your own office-standard symbols instead, simply define blocks with these
+names in your template `.dwg`; the plugin will use yours and skip generation.
+See `resources/symbols/README.md`.
 
 ---
 
@@ -206,4 +238,3 @@ These are functional first-pass implementations, flagged for engineering review:
   filled from the NBR 5410 tables.
 - The router uses nearest-neighbour ordering + orthogonal/vertical runs; a
   graph-based trace would improve wire-length accuracy and fill calculations.
-```

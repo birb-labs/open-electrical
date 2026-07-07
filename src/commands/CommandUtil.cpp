@@ -2,6 +2,7 @@
 #include "models/ProjectData.h"
 #include "models/Room.h"
 #include "services/DatabaseService.h"
+#include "services/SymbolFactory.h"
 #include "utilities/GeometryHelper.h"
 #include "utilities/StringUtil.h"
 
@@ -64,6 +65,11 @@ bool pickPoint(const std::wstring& prompt, Point3& out) {
 std::string insertSymbol(const ACHAR* blockName, const ACHAR* layer,
                          const Point3& pos, double scale) {
     AcDbDatabase* db = acdbHostApplicationServices()->workingDatabase();
+
+    // Define the NBR 5444 symbol block on demand (no external symbol library
+    // needed); falls back to a placeholder only for unknown block names.
+    SymbolFactory::ensure(db, blockName);
+
     AcDbBlockTable* bt = nullptr;
     if (db->getBlockTable(bt, AcDb::kForRead) != Acad::eOk) return {};
 

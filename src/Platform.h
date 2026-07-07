@@ -8,9 +8,15 @@
 #pragma once
 
 // -----------------------------------------------------------------------------
-//  BRX / ObjectARX-compatible headers. On Linux the BRX SDK supplies a
-//  "Windows Platform Emulation" layer, so TCHAR / CString / CArray compile.
+//  BRX / ObjectARX-compatible headers. On Linux/macOS the BRX SDK supplies the
+//  "Windows Platform Emulation" layer via brx_platform_linux.h, which MUST be
+//  included before any other BRX header so TCHAR / CString / CArray and the
+//  Win32 substitutes resolve. On Windows arxHeaders.h is self-sufficient.
 // -----------------------------------------------------------------------------
+#ifndef _WIN32   // Linux, macOS
+  #include "brx_platform_linux.h"
+#endif
+
 #include "arxHeaders.h"
 
 #include <string>

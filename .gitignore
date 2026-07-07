@@ -12,6 +12,7 @@ out/
 *.dylib
 *.exe
 *.brx
+*.lrx
 
 # CMake generated files
 CMakeCache.txt
@@ -49,6 +50,8 @@ Desktop.ini
 *.log
 *.tmp
 temp/
+crash_report.txt
+oe-init.log
 
 # Python
 __pycache__/

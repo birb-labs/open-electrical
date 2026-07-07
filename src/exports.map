@@ -1,0 +1,18 @@
+/* Linker version script for the Linux (.lrx) build.
+ *
+ * BricsCAD only looks up two symbols in a BRX module: acrxEntryPoint and
+ * acrxGetApiVersion (provided by libdrx_entrypoint.a, linked whole-archive).
+ *
+ * Everything else - most importantly the statically-linked wxWidgets - is made
+ * *local* so it is NOT placed in the module's dynamic symbol table. This keeps
+ * our private static wxWidgets from interposing with, or being interposed by,
+ * the wxWidgets that BricsCAD itself loads (a different version), which would
+ * otherwise crash the host at load time.
+ */
+{
+    global:
+        acrxEntryPoint;
+        acrxGetApiVersion;
+    local:
+        *;
+};
