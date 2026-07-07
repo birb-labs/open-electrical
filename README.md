@@ -22,6 +22,18 @@ scope to PRO-Elétrica), following **ABNT NBR 5410** (installations) and
 
 ---
 
+## Documentation
+
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — how the plugin is built:
+  layers, data flow, module lifecycle, persistence, UI seams.
+- **[docs/BRICSCAD-BRX-LINUX.md](docs/BRICSCAD-BRX-LINUX.md)** — field notes on
+  **BricsCAD BRX on Linux**: the SDK-vs-runtime split, the `.lrx` module, the
+  whole-archive entry point, the **wxWidgets version conflict + embedded-init
+  crash and their fixes**, and how to debug when the CAD engine runs inside a
+  `bwrap` sandbox. Read this before doing any BRX/GUI work on Linux.
+
+---
+
 ## 1. Requirements
 
 | | Windows | Linux |
