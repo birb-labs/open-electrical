@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Interface, config &amp; i18n · open-electrical</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <a href="index.html"><img class="brand-logo" src="assets/open-electrical.svg" alt="open-electrical"></a>
+    <div class="tag">Plugin elétrico para BricsCAD · BRX / C++</div>
+    <nav>
+      <a href="index.html">Início</a>
+      <div class="group">Fundamentos</div>
+      <a href="fundamentos.html#requisitos">Requisitos</a>
+      <a href="fundamentos.html#estrutura">Estrutura do projeto</a>
+      <a href="fundamentos.html#tecnologias">Tecnologias</a>
+      <a href="fundamentos.html#logica">Lógica geral</a>
+      <div class="group">Comandos</div>
+      <a href="elementos.html">Elementos &amp; símbolos</a>
+      <a href="calculo.html">Cálculo &amp; circuitos</a>
+      <a href="roteamento.html">Eletrodutos &amp; roteamento</a>
+      <a href="el-wire.html">Fiação (EL-WIRE)</a>
+      <a href="relatorios.html">Relatórios &amp; remoção</a>
+      <div class="group">Interface</div>
+      <a href="interface.html" class="active">Paleta, config &amp; i18n</a>
+    </nav>
+  </aside>
+
+  <main>
+    <h1>Interface, configuração &amp; i18n</h1>
+    <p class="lead">A camada visual do plugin: a <b>paleta</b> dockável (wxWidgets), o diálogo de
+    <b>configuração do projeto</b> (<kbd>EL-CONFIG</kbd>) e o sistema de <b>tradução</b> em tempo
+    de execução. Tudo em <code>src/ui/</code>.</p>
+
+    <h2 id="el">EL — abrir/fechar a paleta principal</h2>
+    <span class="filepath">src/commands/ConfigCommands.cpp — showPalette()</span>
+    <p>O comando <code>EL</code> alterna a paleta dockável (<code>ui::togglePalette()</code>). A
+    paleta é um <code>wxPanel</code> de botões de comando agrupados por etapa do fluxo de trabalho.</p>
+    <span class="filepath">src/ui/MainPalette.h / .cpp</span>
+<pre><code>class MainPalettePanel : public wxPanel {
+    void refresh();                          // reconstrói conteúdo dinâmico (resumo do projeto)
+    void run(const wxString&amp; command);       // envia um comando à linha de comando do documento ativo
+    wxButton* addButton(wxSizer*, const std::string&amp; labelKey, const wxString&amp; command);
+};</code></pre>
+    <p>Cada botão é criado com <code>addButton(sizer, chaveDeTexto, "EL-XXX ")</code>: o rótulo é
+    uma <b>chave de tradução</b> (i18n) e a ação apenas digita o comando na linha de comando. Ou
+    seja, <b>adicionar um botão novo = uma linha</b>, e ele reaproveita toda a lógica do comando.</p>
+
+    <h3>Hospedagem por plataforma (PaletteHost)</h3>
+    <span class="filepath">src/ui/PaletteHost.cpp / .h</span>
+    <p>O <i>painel</i> é idêntico nos dois sistemas; só a <b>hospedagem</b> muda: no Windows ele
+    vive numa <i>docking pane</i> <code>BcUiPanelMFC</code>; no Linux é acoplado como um
+    <code>wxWindow</code> nativo. Esse isolamento (mais o <i>version-script</i> do wxWidgets) foi o
+    que resolveu os travamentos anteriores do wx no Linux.</p>
+
+    <h2 id="el-config">EL-CONFIG — configuração do projeto</h2>
+    <span class="filepath">src/commands/ConfigCommands.cpp — configProject()</span>
+    <p>Carrega as configurações atuais, abre o diálogo modal (<code>ui::showConfigDialog</code>),
+    e persiste. Uma troca de idioma tem efeito <b>imediato</b> em toda a UI.</p>
+<pre><code>ProjectSettings edited = project.settings;
+if (ui::showConfigDialog(edited)) {
+    project.settings = edited;
+    Localization::instance().setLanguage(edited.uiLanguage);   // idioma muda na hora
+    ProjectContext::instance().save();
+    ui::refreshPalette();
+}</code></pre>
+
+    <h3>O que fica em ProjectSettings</h3>
+    <span class="filepath">src/models/ProjectSettings.h</span>
+    <table>
+      <tr><th>Grupo</th><th>Campos</th></tr>
+      <tr><td>Escala</td><td><code>unit</code> (metros/…)</td></tr>
+      <tr><td>Rede elétrica</td><td><code>voltageLineToLine</code>, <code>voltageLineToNeutral</code>, <code>frequency</code>, <code>phases</code>, <code>grounding</code> (TN-S…)</td></tr>
+      <tr><td>Instalação</td><td><code>installation</code> (embutida/aparente), <code>conduitMaterial</code>, <code>defaultWireGaugeMM2</code> (2,5 mm²)</td></tr>
+      <tr><td>Concessionária</td><td><code>utilityProvider</code> + lista <code>providers</code> (NeoEnergia, Enel, CEMIG, COPEL + definidas pelo usuário)</td></tr>
+      <tr><td>Idioma da UI</td><td><code>uiLanguage</code> ("en" · "pt-BR" · "es")</td></tr>
+    </table>
+    <div class="note">Os parâmetros <b>luminotécnicos não são globais</b>: vivem por ambiente
+    (refletâncias, contraste, FM, CU, alturas). O método dos lúmens lê tudo direto do
+    <code>Room</code> — veja <a href="calculo.html">Cálculo</a>.</div>
+
+    <h2 id="i18n">Internacionalização (i18n)</h2>
+    <span class="filepath">src/ui/Localization.h / .cpp · resources/lang/*.json</span>
+    <p>Regra de ouro: <b>comandos e identificadores internos são SEMPRE em inglês</b>; só os textos
+    da UI são traduzidos. Os pacotes de idioma são mapas JSON planos
+    (<code>resources/lang/&lt;código&gt;.json</code>: "en", "pt-BR", "es"). O inglês é o
+    <i>fallback</i> embutido: qualquer chave ausente no pacote ativo cai para o inglês, e qualquer
+    chave ausente em todos os pacotes retorna a si mesma.</p>
+<pre><code>// no código da UI:
+std::string  EL_TR ("btn.cancel");   // UTF-8, idioma ativo
+std::wstring EL_TRW("msg.done");     // std::wstring para a camada wx/BRX
+
+Localization::instance().setLanguage("pt-BR");   // troca em tempo de execução</code></pre>
+    <h3>Adicionar um idioma ou uma string</h3>
+    <ol>
+      <li><b>Nova string:</b> use uma chave (ex.: <code>"btn.route"</code>) no código com
+      <code>EL_TR/EL_TRW</code> e adicione a chave em cada <code>resources/lang/*.json</code>.</li>
+      <li><b>Novo idioma:</b> crie <code>resources/lang/&lt;código&gt;.json</code> (mapa plano
+      chave→texto), acrescente o código à lista de idiomas do diálogo de config, e ele será
+      carregado por <code>loadPacks()</code>.</li>
+    </ol>
+
+    <h2 id="temas">Aparência da paleta e diálogos</h2>
+    <table>
+      <tr><th>Quero mudar…</th><th>Onde mexer</th></tr>
+      <tr><td>Botões/agrupamento da paleta</td><td><code>MainPalettePanel</code> ctor em <code>MainPalette.cpp</code> (<code>addButton</code>)</td></tr>
+      <tr><td>Resumo dinâmico do projeto na paleta</td><td><code>MainPalettePanel::refresh()</code> / <code>summary_</code></td></tr>
+      <tr><td>Campos de um diálogo de elemento</td><td><code>src/ui/ElementDialogs.cpp</code> (Light/Outlet/Switch/Panel)</td></tr>
+      <tr><td>Campos do diálogo de ambiente</td><td><code>src/ui/RoomDialog.cpp</code></td></tr>
+      <tr><td>Campos do diálogo de configuração</td><td><code>src/ui/ConfigDialog.cpp</code></td></tr>
+      <tr><td>Textos exibidos (qualquer idioma)</td><td><code>resources/lang/*.json</code> — nunca hardcode string de UI</td></tr>
+      <tr><td>Ponte comando ↔ UI (abrir diálogos a partir do BRX)</td><td><code>src/ui/UiBridge.cpp/.h</code></td></tr>
+    </table>
+    <div class="note">Há também um layout DCL legado em <code>src/ui/dcl/electrical.dcl</code>;
+    a interface principal atual é wxWidgets. Prefira estender os diálogos wx.</div>
+
+    <h2 id="tabela">Referência rápida — todos os comandos</h2>
+    <table>
+      <tr><th>Comando</th><th>Função</th><th>Página</th></tr>
+      <tr><td>EL</td><td>Abre/fecha a paleta</td><td>esta</td></tr>
+      <tr><td>EL-CONFIG</td><td>Configuração do projeto</td><td>esta</td></tr>
+      <tr><td>EL-ROOM</td><td>Demarcar ambiente</td><td><a href="elementos.html#el-room">Elementos</a></td></tr>
+      <tr><td>EL-LIGHT</td><td>Ponto de luz manual</td><td><a href="elementos.html#el-light">Elementos</a></td></tr>
+      <tr><td>EL-OUTLET / -AUTO</td><td>Tomadas</td><td><a href="elementos.html#el-outlet">Elementos</a></td></tr>
+      <tr><td>EL-SWITCH / -AUTO</td><td>Interruptores</td><td><a href="elementos.html#el-switch">Elementos</a></td></tr>
+      <tr><td>EL-PANEL</td><td>Quadro (QGBT/QD)</td><td><a href="elementos.html#el-panel">Elementos</a></td></tr>
+      <tr><td>EL-EDIT</td><td>Editar componente</td><td><a href="elementos.html#el-edit">Elementos</a></td></tr>
+      <tr><td>EL-CALC-LIGHT / EL-LIGHT-AUTO</td><td>Método dos lúmens</td><td><a href="calculo.html#el-calc-light">Cálculo</a></td></tr>
+      <tr><td>EL-CIRCUIT / -AUTO</td><td>Distribuir circuitos</td><td><a href="calculo.html#el-circuit">Cálculo</a></td></tr>
+      <tr><td>EL-CONDUIT / -AUTO / -EDIT</td><td>Eletrodutos</td><td><a href="roteamento.html">Roteamento</a></td></tr>
+      <tr><td>EL-ROUTE-AUTO</td><td>Rotear + fiar</td><td><a href="roteamento.html#el-route-auto">Roteamento</a></td></tr>
+      <tr><td>EL-WIRE / -AUTO / -FLIP</td><td>Fiação (balões)</td><td><a href="el-wire.html">Fiação</a></td></tr>
+      <tr><td>EL-REPORT / EL-LOAD-SCHEDULE / EL-SINGLE-LINE</td><td>Documentos</td><td><a href="relatorios.html">Relatórios</a></td></tr>
+      <tr><td>EL-DEL / EL-DEL-ROOM</td><td>Remover</td><td><a href="relatorios.html#el-del">Relatórios</a></td></tr>
+      <tr><td>EL-UNDO</td><td>Desfazer</td><td><a href="relatorios.html#el-undo">Relatórios</a></td></tr>
+    </table>
+
+    <footer>open-electrical · Interface, configuração &amp; i18n · fim do guia de comandos.</footer>
+  </main>
+</div>
+</body>
+</html>

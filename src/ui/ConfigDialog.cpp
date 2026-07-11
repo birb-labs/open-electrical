@@ -4,6 +4,7 @@
 
 #include <wx/statline.h>
 #include <algorithm>
+#include <cmath>
 
 namespace electrical {
 namespace ui {
@@ -31,10 +32,10 @@ ConfigDialog::ConfigDialog(wxWindow* parent, const ProjectSettings& initial)
     auto* root = new wxBoxSizer(wxVERTICAL);
     auto* nb   = new wxNotebook(this, wxID_ANY);
 
-    nb->AddPage(buildScalePage(nb),   W("config.scale"));
-    nb->AddPage(buildNetworkPage(nb), W("config.network"));
-    nb->AddPage(buildInstallPage(nb), W("config.installation"));
-    nb->AddPage(buildUtilityPage(nb), W("config.utility"));
+    nb->AddPage(buildScalePage(nb),    W("config.scale"));
+    nb->AddPage(buildNetworkPage(nb),  W("config.network"));
+    nb->AddPage(buildInstallPage(nb),  W("config.installation"));
+    nb->AddPage(buildUtilityPage(nb),  W("config.utility"));
 
     root->Add(nb, 1, wxEXPAND | wxALL, 8);
     root->Add(new wxStaticLine(this), 0, wxEXPAND | wxLEFT | wxRIGHT, 8);
@@ -188,6 +189,7 @@ void ConfigDialog::onAddProvider(wxCommandEvent&) {
     utility_->Append(name);
     utility_->SetSelection(utility_->GetCount() - 1);
 }
+
 
 void ConfigDialog::onOk(wxCommandEvent& e) {
     // Pull control values back into settings_.

@@ -23,6 +23,11 @@ public:
     int         circuitId = -1;  // assigned Circuit id (-1 = unassigned)
     double      powerVA = 0.0;    // apparent power for the load schedule
 
+    // NBR 5444 notation values, mirrored into the symbol's editable block
+    // attributes (see SymbolFactory attribute defs + CommandUtil::insertSymbol).
+    std::string noteLetter;      // controlling-switch letter (a, b, ...) / switch id
+    std::string circuitLabel;    // circuit number shown on the symbol (e.g. "-3-")
+
     explicit ElectricalElement(ElementType t) : type(t) {}
     ~ElectricalElement() override = default;
 

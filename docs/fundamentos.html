@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fundamentos · open-electrical</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <a href="index.html"><img class="brand-logo" src="assets/open-electrical.svg" alt="open-electrical"></a>
+    <div class="tag">Plugin elétrico para BricsCAD · BRX / C++</div>
+    <nav>
+      <a href="index.html">Início</a>
+      <div class="group">Fundamentos</div>
+      <a href="#requisitos" class="active">Requisitos</a>
+      <a href="#estrutura">Estrutura do projeto</a>
+      <a href="#tecnologias">Tecnologias</a>
+      <a href="#logica">Lógica geral</a>
+      <div class="group">Comandos</div>
+      <a href="elementos.html">Elementos &amp; símbolos</a>
+      <a href="calculo.html">Cálculo &amp; circuitos</a>
+      <a href="roteamento.html">Eletrodutos &amp; roteamento</a>
+      <a href="el-wire.html">Fiação (EL-WIRE)</a>
+      <a href="relatorios.html">Relatórios &amp; remoção</a>
+      <div class="group">Interface</div>
+      <a href="interface.html">Paleta, config &amp; i18n</a>
+    </nav>
+  </aside>
+
+  <main>
+    <h1>Fundamentos</h1>
+    <p class="lead">Ambiente, estrutura, stack e a lógica geral de funcionamento do plugin.</p>
+
+    <!-- ===================== REQUISITOS ===================== -->
+    <h2 id="requisitos">Requisitos</h2>
+    <p>O <code>open-electrical</code> é um módulo nativo compilado (não é LISP), então exige o
+    <b>BricsCAD Pro ou superior</b> (a edição Lite carrega apenas LISP). Foi desenvolvido e
+    testado para <b>BricsCAD V26</b> em <b>Linux</b> (também compila para Windows).</p>
+
+    <h3>Dependências de build</h3>
+    <table>
+      <tr><th>Item</th><th>Versão / caminho padrão</th><th>Para quê</th></tr>
+      <tr><td>BRX SDK</td><td>V26 — <code>/opt/brx_sdk_v26</code> (<code>BRX_SDK_ROOT</code>)</td><td>Headers/libs da API C++ do BricsCAD</td></tr>
+      <tr><td>BricsCAD</td><td>V26 — <code>/opt/bricsys/bricscad/v26</code></td><td>Host onde o <code>.lrx</code> é carregado</td></tr>
+      <tr><td>wxWidgets</td><td>3.2.8 <b>estático</b> — <code>~/.local/opt/wxstatic-oel-3.2.8</code></td><td>Paletas dockáveis e diálogos</td></tr>
+      <tr><td>Compilador</td><td>GCC/Clang com <b>C++17</b></td><td><code>CMAKE_CXX_STANDARD 17</code></td></tr>
+      <tr><td>Build system</td><td>CMake + Ninja</td><td>Configuração e compilação</td></tr>
+    </table>
+
+    <div class="warn">
+      <b>Por que wxWidgets ESTÁTICO no Linux?</b> O BricsCAD já carrega o seu próprio
+      wxWidgets (3.1). Linkar o módulo contra um wxWidgets <i>compartilhado</i> do sistema
+      coloca dois runtimes wx no mesmo processo e <b>derruba o host</b> ao carregar. Por isso
+      o CMake linka um wxWidgets <b>privado e estático</b> (prefixo <code>wxstatic-oel-*</code>).
+    </div>
+
+    <h3>Compilar e instalar</h3>
+    <p>Há um script que configura, compila e instala em um passo:</p>
+    <span class="filepath">scripts/setup.sh</span>
+<pre><code>bash scripts/setup.sh
+# → build/ (Ninja) → open-electrical.lrx
+# → instala em ~/.local/share/open-electrical/</code></pre>
+    <p>Rodar os testes de unidade (núcleo sem BRX):</p>
+<pre><code>cmake --build build --target check   # executa oe_tests</code></pre>
+    <p>Carregar no BricsCAD:</p>
+<pre><code>APPLOAD  →  ~/.local/share/open-electrical/open-electrical.lrx
+; ou na linha de comando:
+(arxload "/home/&lt;user&gt;/.local/share/open-electrical/open-electrical.lrx")</code></pre>
+    <div class="warn"><b>Cache de carga (.lrx).</b> O BricsCAD faz cache do módulo em nível de
+    processo. Depois de recompilar, <b>feche e reabra o BricsCAD</b> — um simples re-APPLOAD
+    pode continuar executando o binário antigo.</div>
+
+    <!-- ===================== ESTRUTURA ===================== -->
+    <h2 id="estrutura">Estrutura do projeto</h2>
+<pre><code>open-electrical/
+├── CMakeLists.txt          # build; alvo MODULE → open-electrical.lrx + alvo de testes
+├── scripts/setup.sh        # configura + compila + instala
+├── cmake/                  # find_package(BRX), etc.
+├── resources/
+│   ├── lang/               # pt-BR.json, en.json, es.json (i18n)
+│   ├── symbols/            # blocos de símbolos
+│   └── ui/dcl/             # diálogos DCL
+├── tests/                  # test_framework.h + tests.cpp (núcleo sem BRX)
+└── src/
+    ├── main.cpp            # entrypoint ARX (IMPLEMENT_ARX_ENTRYPOINT)
+    ├── Platform.h          # inclui os headers BRX/ARX
+    ├── commands/           # comandos EL-* (a "camada de UI de linha de comando")
+    ├── models/             # dados puros: Room, Circuit, Conduit, Outlet, ProjectData…
+    ├── services/           # regras: Router, CircuitDistributor, LightingCalculator…
+    ├── ui/                 # paletas wxWidgets, diálogos, i18n
+    └── utilities/          # helpers geométricos: ElementOutline, PolyMath, Geometry…</code></pre>
+
+    <h3>Camadas (fluxo de uma dependência)</h3>
+    <p><b>commands → services → models / utilities.</b> Os arquivos em <code>commands/</code>
+    conversam com o BricsCAD (pegar pontos, desenhar entidades, imprimir na linha de comando)
+    e delegam a lógica para <code>services/</code>, que operam sobre estruturas puras de
+    <code>models/</code>. Os <code>utilities/</code> (ex.: geometria) não dependem do BRX e por
+    isso são cobertos por testes de unidade.</p>
+
+    <!-- ===================== TECNOLOGIAS ===================== -->
+    <h2 id="tecnologias">Tecnologias</h2>
+    <table>
+      <tr><th>Camada</th><th>Tecnologia</th><th>Observações</th></tr>
+      <tr><td>Linguagem</td><td>C++17</td><td>Sem exceções para controle de fluxo; RAII</td></tr>
+      <tr><td>API CAD</td><td>BRX (ObjectARX-compatível)</td><td>Mesmo código compila para ARX (AutoCAD) e BRX (BricsCAD); binários não são intercambiáveis</td></tr>
+      <tr><td>Banco de dados</td><td>Teigha / ODA (<code>AcDb*</code>, <code>AcGe*</code>)</td><td>Entidades, geometria, transações do desenho</td></tr>
+      <tr><td>UI</td><td>wxWidgets 3.2.8 (estático)</td><td>Paletas dockáveis + diálogos</td></tr>
+      <tr><td>Build</td><td>CMake + Ninja</td><td><code>add_library(open_electrical MODULE ...)</code> → <code>.lrx</code></td></tr>
+      <tr><td>Testes</td><td>framework próprio (<code>tests/test_framework.h</code>)</td><td>Leve, sem dependências; cobre o núcleo sem BRX</td></tr>
+    </table>
+
+    <!-- ===================== LÓGICA GERAL ===================== -->
+    <h2 id="logica">Lógica geral de funcionamento</h2>
+    <p>O plugin registra uma tabela de comandos <code>EL-*</code> e mantém um <b>modelo de
+    projeto</b> (<code>ProjectData</code>) que espelha, em memória, tudo o que foi inserido
+    no desenho: cômodos, componentes, circuitos e eletrodutos.</p>
+
+    <h3>1. Registro de comandos</h3>
+    <p>Todos os comandos ficam numa tabela única e são registrados automaticamente.</p>
+    <span class="filepath">src/commands/Commands.cpp</span>
+<pre><code>{ _T("EL-CIRCUIT-AUTO"),_T("EL-CIRCUIT-AUTO"),&distributeCircuitsAuto, ACRX_CMD_MODAL },
+{ _T("EL-CONDUIT-AUTO"),_T("EL-CONDUIT-AUTO"),&routeConduitAuto,       ACRX_CMD_MODAL },
+{ _T("EL-WIRE"),        _T("EL-WIRE"),        &routeWire,              ACRX_CMD_MODAL },
+{ _T("EL-WIRE-AUTO"),   _T("EL-WIRE-AUTO"),   &routeWireAuto,          ACRX_CMD_MODAL },
+{ _T("EL-WIRE-FLIP"),   _T("EL-WIRE-FLIP"),   &flipWiring,  ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET },
+// ... (adicionar um comando = 1 linha aqui + 1 declaração em Commands.h)</code></pre>
+
+    <h3>2. O modelo <code>ProjectData</code></h3>
+    <p>É o "documento" do plugin. Cada componente/eletroduto guarda o <b>handle</b> da sua
+    entidade no desenho, então o modelo e o desenho ficam sincronizados por handle.</p>
+    <span class="filepath">src/models/ProjectData.h (resumo)</span>
+<pre><code>struct ProjectData {
+    std::vector&lt;Room&gt;                              rooms;
+    std::vector&lt;std::unique_ptr&lt;ElectricalElement&gt;&gt; elements; // tomadas, luzes, interruptores, quadros
+    std::vector&lt;Circuit&gt;                           circuits;   // ramais
+    std::vector&lt;Conduit&gt;                           conduits;   // eletrodutos
+    ProjectSettings settings;
+    // + alloc*Id() para ids incrementais
+};</code></pre>
+
+    <h3>3. Persistência</h3>
+    <p>O <code>ProjectContext</code> (singleton) serializa o <code>ProjectData</code> para
+    dentro do próprio DWG (via <code>PropertyBag</code> → dicionário/named object). Cada
+    <code>save()</code> grava; ao abrir o desenho, o estado é reconstruído. Por isso a
+    identificação de circuitos <b>não</b> usa camadas ou atributos de bloco: ela vive no
+    modelo, ligada aos componentes por <code>circuitId</code>.</p>
+
+    <h3>4. Um comando típico, do começo ao fim</h3>
+    <ol>
+      <li>O usuário digita <code>EL-…</code>; o BricsCAD chama a função registrada.</li>
+      <li>A função pega <code>ProjectContext::instance().project()</code>.</li>
+      <li>Abre um <code>UndoGroup</code> (para o comando ser um único "desfazer").</li>
+      <li>Chama um <i>service</i> (ex.: <code>Router</code>) que altera o modelo.</li>
+      <li>Desenha as entidades resultantes (helpers em <code>CommandUtil.cpp</code>).</li>
+      <li><code>ProjectContext::instance().save()</code> e imprime um resumo.</li>
+    </ol>
+
+    <div class="note">Pronto para o mergulho profundo? Vá para
+    <a href="el-wire.html">EL-WIRE / EL-WIRE-AUTO</a> — o comando que calcula os condutores por
+    circuito e desenha os balões dentro dos eletrodutos.</div>
+
+    <footer>open-electrical · Fundamentos</footer>
+  </main>
+</div>
+</body>
+</html>

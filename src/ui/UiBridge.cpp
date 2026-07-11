@@ -6,6 +6,7 @@
 
 #include <wx/wx.h>
 #include <wx/app.h>
+#include <wx/choicdlg.h>
 #include <wx/image.h>
 
 namespace electrical {
@@ -94,6 +95,15 @@ bool showRoomDialog(Room& room) {
         room = dlg.result();
         return true;
     }
+    return false;
+}
+
+bool showRoomPicker(const std::vector<std::string>& items, int& outIndex) {
+    if (!ensureWxInitialized()) return false;
+    wxArrayString choices;
+    for (const auto& s : items) choices.Add(wxString::FromUTF8(s.c_str()));
+    wxSingleChoiceDialog dlg(hostParent(), "Select a room to remove:", "EL-DEL-ROOM", choices);
+    if (dlg.ShowModal() == wxID_OK) { outIndex = dlg.GetSelection(); return true; }
     return false;
 }
 

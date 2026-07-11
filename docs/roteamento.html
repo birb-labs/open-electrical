@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Eletrodutos &amp; roteamento · open-electrical</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <a href="index.html"><img class="brand-logo" src="assets/open-electrical.svg" alt="open-electrical"></a>
+    <div class="tag">Plugin elétrico para BricsCAD · BRX / C++</div>
+    <nav>
+      <a href="index.html">Início</a>
+      <div class="group">Fundamentos</div>
+      <a href="fundamentos.html#requisitos">Requisitos</a>
+      <a href="fundamentos.html#estrutura">Estrutura do projeto</a>
+      <a href="fundamentos.html#tecnologias">Tecnologias</a>
+      <a href="fundamentos.html#logica">Lógica geral</a>
+      <div class="group">Comandos</div>
+      <a href="elementos.html">Elementos &amp; símbolos</a>
+      <a href="calculo.html">Cálculo &amp; circuitos</a>
+      <a href="roteamento.html" class="active">Eletrodutos &amp; roteamento</a>
+      <a href="el-wire.html">Fiação (EL-WIRE)</a>
+      <a href="relatorios.html">Relatórios &amp; remoção</a>
+      <div class="group">Interface</div>
+      <a href="interface.html">Paleta, config &amp; i18n</a>
+    </nav>
+  </aside>
+
+  <main>
+    <h1>Eletrodutos &amp; roteamento</h1>
+    <p class="lead">Como o plugin desenha os <b>eletrodutos</b> (o caminho físico) — automática ou
+    manualmente — e como cada extremidade "gruda" no contorno do componente pela
+    <code>ElementOutline</code>, para nunca começar/terminar dentro de um símbolo.</p>
+
+    <h2 id="el-conduit-auto">EL-CONDUIT-AUTO — roteamento automático</h2>
+    <span class="filepath">src/commands/CircuitCommands.cpp — routeConduitAuto()</span>
+    <p>Pré-requisito: existir circuitos (<kbd>EL-CIRCUIT-AUTO</kbd>). Pergunta se deve
+    <b>omitir os eletrodutos horizontais</b> (só descidas verticais — um estilo comum de
+    documentação), monta as <code>RoutingOptions</code> e chama <code>Router::route()</code>. Os
+    eletrodutos são desenhados como polilinhas <b>3D</b>, para que as descidas verticais
+    (teto → dispositivo, que só diferem em Z) fiquem visíveis em vez de colapsar num ponto.</p>
+<pre><code>RoutingOptions opt;
+opt.omitHorizontal = /* resposta Yes/No */;
+opt.material       = project.settings.conduitMaterial;
+opt.ceilingZ       = /* pé-direito do ambiente mais alto, em unidades de desenho */;
+RoutingResult r = Router::route(project, opt);
+for (const auto&amp; c : project.conduits)
+    if (c.handle.empty()) c.handle = drawPolyline3D(kLayerConduit, c.path);</code></pre>
+    <div class="note">O <code>Router</code> conecta os elementos de cada circuito de volta ao seu
+    quadro: em modo completo, trechos ortogonais no teto + descidas verticais; em
+    <code>omitHorizontal</code>, apenas a descida vertical de cada dispositivo.</div>
+
+    <h2 id="el-conduit">EL-CONDUIT — eletroduto manual entre dois elementos</h2>
+    <span class="filepath">src/commands/CircuitCommands.cpp — routeConduit()</span>
+    <p>Selecione a <b>ORIGEM</b> e o <b>DESTINO</b>. O eletroduto corre reto entre os dois pontos de
+    conexão definidos pelo <i>contorno</i> de cada componente: começa no contorno da origem no
+    ponto mais próximo do destino, e termina no contorno do destino no ponto mais próximo da
+    origem — assim nunca começa/termina dentro de um símbolo. Os circuitos que passam por um
+    trecho manual são os circuitos dos dispositivos das pontas.</p>
+<pre><code>AttachSpec src, dst;                       // tipo + nº de módulos + transformada de cada pick
+mutualAttachPoints(src, dst, pA, pB);      // pontos de conexão mutuamente mais próximos
+Conduit c;
+c.srcHandle = src.handle; c.dstHandle = dst.handle;
+c.path = { pA, pB };                       // segmento reto, pontas no contorno
+c.handle = drawPolyline(kLayerConduit, c.path, false);</code></pre>
+
+    <h2 id="el-conduit-edit">EL-CONDUIT-EDIT — remodelar um trecho manual</h2>
+    <span class="filepath">src/commands/CircuitCommands.cpp — editConduit()</span>
+    <p>Escolha o trecho e depois <b>[Source/Destination/Curve]</b>:</p>
+    <ul>
+      <li><b>Curve</b> (padrão): informe um ponto por onde a curva deve passar; o <i>bulge</i> é
+      calculado pela flecha (sagitta) do ponto em relação à corda —
+      <code>bulge = 2·sag / corda = tan(θ/4)</code>. O trecho vira um arco.</li>
+      <li><b>Source / Destination</b>: mova aquela extremidade; o novo ponto é <b>reancorado</b> no
+      contorno do respectivo componente (<code>attachPoint</code>), continuando dentro das
+      conexões permitidas.</li>
+    </ul>
+    <p>A edição atualiza o desenho <b>e</b> o modelo (path/bulge/length), então flui direto para a
+    lista de materiais. Só trechos retos elemento-a-elemento (<code>path.size() == 2</code>) são
+    editáveis.</p>
+
+    <h2 id="el-route-auto">EL-ROUTE-AUTO — rotear + fiar num passo</h2>
+    <span class="filepath">src/commands/CircuitCommands.cpp — routeAllAuto()</span>
+    <p>Atalho: roda <code>routeConduitAuto()</code> e, na sequência,
+    <code>Router::pullWires()</code> + <code>refreshWiringBalloons()</code>, deixando a lista de
+    materiais completa (eletroduto + condutores + balões) num único comando.</p>
+
+    <h2 id="outline">Pontos de conexão — ElementOutline</h2>
+    <span class="filepath">src/utilities/ElementOutline.h / .cpp</span>
+    <p>É a peça que decide <b>onde</b> um eletroduto pode tocar cada componente. É deliberadamente
+    <b>livre de BRX/AcGe</b> (opera sobre <code>Point3</code> puro), então é <i>unit-testável</i>.
+    Cada tipo expõe um contorno que espelha a geometria da <code>SymbolFactory</code>:</p>
+    <table>
+      <tr><th>Kind</th><th>Contorno</th></tr>
+      <tr><td><code>Light</code></td><td>Círculo do raio da luminária de teto</td></tr>
+      <tr><td><code>Outlet</code></td><td>Cadeia de triângulos de uma tomada baixa, com o mesmo nº de módulos</td></tr>
+      <tr><td><code>Switch</code></td><td>Círculo de interruptor de 1 seção (+ a haste da parede)</td></tr>
+      <tr><td><code>Panel</code></td><td>Retângulo 3:1</td></tr>
+    </table>
+    <p>O contorno vive no <b>referencial local</b> do símbolo (+Y para fora da parede, origem no
+    ponto de inserção); os chamadores convertem para/de coordenadas do mundo com a posição +
+    rotação da referência de bloco (<code>toWorld</code>/<code>toLocal</code>).</p>
+<pre><code>// ponto do contorno (no mundo) mais próximo de um alvo
+Point3 nearestAttachPoint(Kind kind, int modules, const Point3&amp; origin,
+                          double rot, const Point3&amp; target);
+
+// duas pontas convergindo (usado pelo EL-CONDUIT manual):
+pA = attachPoint(a, b.pos);   // ponto de A mais perto de B
+pB = attachPoint(b, pA);      // ponto de B mais perto de pA
+pA = attachPoint(a, pB);      // refina até ambos concordarem
+pB = attachPoint(b, pA);</code></pre>
+
+    <h3>Como customizar o roteamento</h3>
+    <table>
+      <tr><th>Quero mudar…</th><th>Onde mexer</th></tr>
+      <tr><td>Estratégia de roteamento (ortogonal, descidas, tronco)</td><td><code>Router::route()</code> em <code>Router.cpp</code></td></tr>
+      <tr><td>Material/diâmetro padrão do eletroduto</td><td><code>RoutingOptions</code> (<code>material</code>, <code>diameterMM</code>) e <code>ProjectSettings.conduitMaterial</code></td></tr>
+      <tr><td>Altura de referência do teto</td><td><code>RoutingOptions.ceilingZ</code> (0 = usar o ambiente)</td></tr>
+      <tr><td>Onde o eletroduto encosta em cada componente</td><td><code>outline::segments(kind, modules)</code> — a forma do contorno por tipo</td></tr>
+      <tr><td>Classificação do bloco → Kind/módulos</td><td><code>classifyOutline()</code> em <code>CircuitCommands.cpp</code></td></tr>
+      <tr><td>Camada dos eletrodutos</td><td><code>kLayerConduit</code> (<code>EL_CONDUIT</code>)</td></tr>
+    </table>
+    <div class="note">A contagem de condutores que passa por cada eletroduto
+    (<code>Router::conduitConductors</code>) e o desenho do "balão" de fiação estão detalhados na
+    página <a href="el-wire.html">Fiação (EL-WIRE)</a>.</div>
+
+    <footer>open-electrical · Eletrodutos &amp; roteamento · continua em <a href="el-wire.html">Fiação (EL-WIRE)</a></footer>
+  </main>
+</div>
+</body>
+</html>

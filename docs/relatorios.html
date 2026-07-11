@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Relatórios &amp; remoção · open-electrical</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <a href="index.html"><img class="brand-logo" src="assets/open-electrical.svg" alt="open-electrical"></a>
+    <div class="tag">Plugin elétrico para BricsCAD · BRX / C++</div>
+    <nav>
+      <a href="index.html">Início</a>
+      <div class="group">Fundamentos</div>
+      <a href="fundamentos.html#requisitos">Requisitos</a>
+      <a href="fundamentos.html#estrutura">Estrutura do projeto</a>
+      <a href="fundamentos.html#tecnologias">Tecnologias</a>
+      <a href="fundamentos.html#logica">Lógica geral</a>
+      <div class="group">Comandos</div>
+      <a href="elementos.html">Elementos &amp; símbolos</a>
+      <a href="calculo.html">Cálculo &amp; circuitos</a>
+      <a href="roteamento.html">Eletrodutos &amp; roteamento</a>
+      <a href="el-wire.html">Fiação (EL-WIRE)</a>
+      <a href="relatorios.html" class="active">Relatórios &amp; remoção</a>
+      <div class="group">Interface</div>
+      <a href="interface.html">Paleta, config &amp; i18n</a>
+    </nav>
+  </aside>
+
+  <main>
+    <h1>Relatórios &amp; remoção</h1>
+    <p class="lead">Os comandos que <b>produzem documentos</b> (legenda, quadro de cargas, lista
+    de materiais, diagrama unifilar) e os que <b>removem</b> objetos mantendo modelo e desenho em
+    sincronia — mais o <kbd>EL-UNDO</kbd>.</p>
+
+    <h2 id="el-report">EL-REPORT — os quatro documentos</h2>
+    <span class="filepath">src/commands/ReportCommands.cpp — generateReport()</span>
+    <p>Pergunta qual documento <b>[Legend/Loads/Bom/Sld/All]</b>, pede um ponto de inserção e
+    coloca cada relatório como um bloco de <code>MText</code> na camada de texto, empilhados
+    verticalmente. O texto vem do serviço <code>ReportGenerator</code> (que só produz strings —
+    quem desenha é a camada de comando).</p>
+    <table>
+      <tr><th>Opção</th><th>Documento</th><th>Gerador</th></tr>
+      <tr><td>Legend</td><td>Legenda: símbolo → descrição de cada tipo usado no projeto</td><td><code>ReportGenerator::legend()</code></td></tr>
+      <tr><td>Loads</td><td>Quadro de cargas: uma linha por circuito com dimensionamento</td><td><code>ReportGenerator::loadSchedule()</code></td></tr>
+      <tr><td>Bom</td><td>Lista de materiais: quantidades agregadas de dispositivos, eletroduto e fio</td><td><code>ReportGenerator::billOfMaterialsText()</code></td></tr>
+      <tr><td>Sld</td><td>Diagrama unifilar (descrição/netlist textual)</td><td><code>ReportGenerator::singleLineDiagram()</code></td></tr>
+      <tr><td>All</td><td>Emite os quatro, empilhados (passo <code>dy = 4.0</code>)</td><td>—</td></tr>
+    </table>
+
+    <h2 id="el-load-schedule">EL-LOAD-SCHEDULE — quadro de cargas direto</h2>
+    <span class="filepath">src/commands/ReportCommands.cpp — generateLoadSchedule()</span>
+    <p>Atalho para inserir só o quadro de cargas num ponto escolhido
+    (<code>ReportGenerator::loadSchedule()</code>).</p>
+
+    <h2 id="el-single-line">EL-SINGLE-LINE — diagrama unifilar direto</h2>
+    <span class="filepath">src/commands/ReportCommands.cpp — generateSingleLine()</span>
+    <p>Atalho para inserir só o unifilar (<code>ReportGenerator::singleLineDiagram()</code>).</p>
+
+    <div class="note">Cada relatório é montado a partir do estado atual de
+    <code>ProjectData</code>. Para relatórios corretos, rode antes a distribuição
+    (<a href="calculo.html"><kbd>EL-CIRCUIT-AUTO</kbd></a>), o roteamento e a fiação — o quadro de
+    cargas e a BOM leem circuitos, eletrodutos e condutores.</div>
+
+    <h2 id="el-del">EL-DEL — remover componentes/eletrodutos</h2>
+    <span class="filepath">src/commands/DeleteCommands.cpp — deleteSelected()</span>
+    <p>Selecione qualquer quantidade de componentes e/ou eletrodutos; cada entidade é apagada do
+    desenho <b>e</b> removida do modelo, para que o quadro de cargas e a lista de materiais
+    permaneçam em sincronia. Ao remover um eletroduto, o seu <b>balão de fiação</b> também é
+    apagado (via <code>annotationHandles</code>), evitando etiquetas órfãs.</p>
+<pre><code>if (dropFromModel(project, handleOfId(id))) ++modelHits;   // tira do modelo (+ apaga balão)
+if (eraseEntity(id)) ++erased;                              // apaga a entidade do desenho</code></pre>
+
+    <h2 id="el-del-room">EL-DEL-ROOM — remover só o contorno de um ambiente</h2>
+    <span class="filepath">src/commands/DeleteCommands.cpp — deleteRoom()</span>
+    <p>Escolha um ambiente numa lista; apaga <b>apenas</b> a polilinha de contorno. Os componentes
+    ficam onde estão — só o vínculo com o ambiente é limpo (<code>e-&gt;roomId = -1</code>), para que
+    nada aponte para um ambiente que não existe mais.</p>
+
+    <h2 id="el-undo">EL-UNDO — desfazer a última ação do plugin</h2>
+    <span class="filepath">src/commands/ReportCommands.cpp — undoLast()</span>
+    <p>Reverte o último grupo de <i>undo</i> do plugin no desenho e <b>recarrega</b> o modelo a
+    partir do .dwg restaurado (<code>ProjectContext::instance().reload()</code>), para que modelo e
+    desenho voltem juntos. Todos os comandos abrem um <code>UndoGroup</code> nomeado (ex.:
+    <code>UndoGroup undo(_T("EL-ROOM"))</code>), o que também os torna reversíveis pelo UNDO nativo
+    do BricsCAD.</p>
+
+    <h3>Como customizar os relatórios</h3>
+    <table>
+      <tr><th>Quero mudar…</th><th>Onde mexer</th></tr>
+      <tr><td>Conteúdo/colunas de um documento</td><td>O gerador correspondente em <code>ReportGenerator.cpp</code></td></tr>
+      <tr><td>Itens da lista de materiais</td><td><code>ReportGenerator::billOfMaterials()</code> (retorna <code>BomLine{item, unit, quantity}</code>)</td></tr>
+      <tr><td>Como o texto é desenhado (fonte, altura, camada)</td><td><code>placeReport()</code> em <code>ReportCommands.cpp</code> (<code>setTextHeight(0.2)</code>, camada <code>kLayerText</code>)</td></tr>
+      <tr><td>Espaçamento entre relatórios em "All"</td><td>A variável <code>dy</code> em <code>generateReport()</code></td></tr>
+    </table>
+
+    <footer>open-electrical · Relatórios &amp; remoção · continua em <a href="interface.html">Interface</a></footer>
+  </main>
+</div>
+</body>
+</html>

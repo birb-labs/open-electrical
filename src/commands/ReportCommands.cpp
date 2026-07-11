@@ -72,6 +72,24 @@ void generateReport() {
     acutPrintf(_T("\n%s\n"), EL_TRW("msg.done").c_str());
 }
 
+void generateLoadSchedule() {
+    ProjectData& project = ProjectContext::instance().project();
+    Point3 at;
+    if (!pickPoint(L"Load schedule insertion point", at)) return;
+    UndoGroup undo(_T("EL-LOAD-SCHEDULE"));
+    placeReport(ReportGenerator::loadSchedule(project), at);
+    acutPrintf(_T("\n%s\n"), EL_TRW("msg.done").c_str());
+}
+
+void generateSingleLine() {
+    ProjectData& project = ProjectContext::instance().project();
+    Point3 at;
+    if (!pickPoint(L"Single-line diagram insertion point", at)) return;
+    UndoGroup undo(_T("EL-SINGLE-LINE"));
+    placeReport(ReportGenerator::singleLineDiagram(project), at);
+    acutPrintf(_T("\n%s\n"), EL_TRW("msg.done").c_str());
+}
+
 void undoLast() {
     if (undoLastPluginAction()) {
         // The drawing rolled back; reload the model from the (restored) dwg.

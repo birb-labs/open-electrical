@@ -20,6 +20,10 @@
 namespace electrical {
 
 struct LightingInput {
+    // Zero means "derive automatically": target lux from the room usage, CU from
+    // the room index. Non-zero values override the automatic figure.
+    double targetLuxOverride  = 0.0;     // E (lux)
+    double cuOverride         = 0.0;     // CU (coefficient of utilization)
     double lumensPerLuminaire = 2000.0;  // luminous flux of one fitting
     double wattsPerLuminaire  = 18.0;    // for the load schedule
     double maintenanceFactor  = 0.80;    // MF (clean/normal environment)
@@ -27,10 +31,12 @@ struct LightingInput {
     double wallReflectance    = 0.50;
     double floorReflectance   = 0.20;
     double workPlaneHeight    = 0.75;    // m above floor
+    TaskContrast contrast     = TaskContrast::Medium;  // picks within the E range
 };
 
 struct LightingResult {
     double requiredLux        = 0.0;
+    double areaM2             = 0.0;   // floor area actually used by the method
     double roomIndex          = 0.0;   // K
     double utilizationFactor  = 0.0;   // CU
     double totalLumensNeeded  = 0.0;
@@ -41,7 +47,11 @@ struct LightingResult {
 
 class LightingCalculator {
 public:
-    // Target illuminance (lux) for a room usage, per NBR 5413 / ISO 8995.
+    // Target illuminance (lux) for a room usage, per NBR 5413 / ISO 8995. Each
+    // usage has a low/mid/high range; the contrast picks which bound is used
+    // (Low -> lower, Medium -> mid, High -> upper).
+    static double targetLux(RoomUsage usage, TaskContrast contrast);
+    // Convenience overload: the mid value of the range (contrast = Medium).
     static double targetLux(RoomUsage usage);
 
     // Full luminotechnical calculation + grid layout for a room.

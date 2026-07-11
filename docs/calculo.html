@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cálculo &amp; circuitos · open-electrical</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <a href="index.html"><img class="brand-logo" src="assets/open-electrical.svg" alt="open-electrical"></a>
+    <div class="tag">Plugin elétrico para BricsCAD · BRX / C++</div>
+    <nav>
+      <a href="index.html">Início</a>
+      <div class="group">Fundamentos</div>
+      <a href="fundamentos.html#requisitos">Requisitos</a>
+      <a href="fundamentos.html#estrutura">Estrutura do projeto</a>
+      <a href="fundamentos.html#tecnologias">Tecnologias</a>
+      <a href="fundamentos.html#logica">Lógica geral</a>
+      <div class="group">Comandos</div>
+      <a href="elementos.html">Elementos &amp; símbolos</a>
+      <a href="calculo.html" class="active">Cálculo &amp; circuitos</a>
+      <a href="roteamento.html">Eletrodutos &amp; roteamento</a>
+      <a href="el-wire.html">Fiação (EL-WIRE)</a>
+      <a href="relatorios.html">Relatórios &amp; remoção</a>
+      <div class="group">Interface</div>
+      <a href="interface.html">Paleta, config &amp; i18n</a>
+    </nav>
+  </aside>
+
+  <main>
+    <h1>Cálculo &amp; circuitos</h1>
+    <p class="lead">Os dois serviços de <b>engenharia</b> do plugin: o cálculo luminotécnico
+    (método dos lúmens, NBR 5413) que posiciona as luminárias, e a distribuição automática de
+    circuitos (NBR 5410) que agrupa os elementos em circuitos e dimensiona condutor/disjuntor.</p>
+
+    <h2 id="el-calc-light">EL-CALC-LIGHT / EL-LIGHT-AUTO — método dos lúmens</h2>
+    <span class="filepath">src/commands/ElementCommands.cpp — runLightingCalc() → placeLightsInRoom()</span>
+    <p>Ambos chamam <code>runLightingCalc()</code>: listam os ambientes para o usuário escolher um
+    (ou "Todos"), perguntam a luminária (fluxo/potência) e rodam o método dos lúmens por ambiente,
+    usando os <b>parâmetros do próprio ambiente</b> (refletâncias, fator de manutenção, plano de
+    trabalho, contraste — nada é global). As luminárias são inseridas numa grade uniforme.</p>
+    <div class="note">A iluminância-alvo é <b>derivada</b> do uso do ambiente + contraste
+    (NBR 5413), não digitada. Pré-requisito: existir ao menos um ambiente (<kbd>EL-ROOM</kbd>)
+    com uso/pé-direito definidos.</div>
+
+    <h3>A fórmula (LightingCalculator)</h3>
+    <span class="filepath">src/services/LightingCalculator.h / .cpp</span>
+<pre><code>Φ_total = (E · A) / (CU · FM)          // fluxo total necessário (lúmens)
+N       = ceil(Φ_total / Φ_luminária)  // nº de luminárias, arredondado p/ cima</code></pre>
+    <table>
+      <tr><th>Símbolo</th><th>Significado</th><th>De onde vem</th></tr>
+      <tr><td>E</td><td>Iluminância-alvo (lux)</td><td><code>targetLux(uso, contraste)</code> — faixa NBR 5413 escolhida pelo contraste (baixo→piso, médio→meio, alto→topo)</td></tr>
+      <tr><td>A</td><td>Área de piso (m²)</td><td>Polígono do ambiente</td></tr>
+      <tr><td>CU</td><td>Coef. de utilização</td><td><code>utilizationFactor(K, refletância_teto)</code> — aproximação monotônica das tabelas do fabricante; sobreposto por <code>cuOverride</code> do ambiente</td></tr>
+      <tr><td>FM</td><td>Fator de manutenção</td><td>Ambiente (padrão 0,80)</td></tr>
+      <tr><td>K</td><td>Índice do ambiente</td><td>Derivado de A e das alturas (pé-direito, plano de trabalho)</td></tr>
+    </table>
+    <p>A linha impressa é o diagnóstico: <code>Room "Sala": 4 luminaire(s), E=150 lux (achieved
+    168), A=12.00 m², K=0.85, CU=0.52.</code> As luminárias automáticas nascem com comando
+    <code>"A"</code> e circuito <code>"?"</code> — refinados depois por <kbd>EL-EDIT</kbd> e
+    <kbd>EL-CIRCUIT-AUTO</kbd>.</p>
+
+    <h3>Como customizar o cálculo de iluminação</h3>
+    <table>
+      <tr><th>Quero mudar…</th><th>Onde mexer</th></tr>
+      <tr><td>Iluminância-alvo por uso do ambiente</td><td><code>LightingCalculator::targetLux()</code> (faixas NBR 5413)</td></tr>
+      <tr><td>Curva do coeficiente de utilização (CU)</td><td><code>LightingCalculator::utilizationFactor()</code> — ou plugar a tabela fotométrica real da luminária</td></tr>
+      <tr><td>Fator de manutenção, refletâncias, plano de trabalho</td><td>Por ambiente, no diálogo de <kbd>EL-ROOM</kbd> (campos de <code>Room</code>); leitura em <code>lightingInputForRoom()</code></td></tr>
+      <tr><td>Layout das luminárias (grade)</td><td><code>LightingCalculator::calculate()</code> — geração de <code>positions</code></td></tr>
+      <tr><td>Fluxo/potência padrão da luminária</td><td><code>LightingInput.lumensPerLuminaire / wattsPerLuminaire</code> (diálogo de execução)</td></tr>
+    </table>
+
+    <h2 id="el-circuit">EL-CIRCUIT / EL-CIRCUIT-AUTO — distribuição de circuitos</h2>
+    <span class="filepath">src/commands/CircuitCommands.cpp — distributeCircuitsAuto()</span>
+    <p>Chama <code>CircuitDistributor::distribute()</code> (serviço puro, que só mexe no modelo) e,
+    de volta ao comando, <b>empurra o número de circuito atribuído para o atributo
+    <code>CIRCUITO</code></b> de cada símbolo já desenhado (via <code>syncElementAttributes</code>).
+    Sem esse passo, os símbolos ficariam mostrando o que foi digitado na inserção, ou "?".</p>
+<pre><code>DistributionResult r = CircuitDistributor::distribute(project);
+for (auto&amp; e : project.elements) {
+    if (e-&gt;circuitId &lt; 0 || e-&gt;handle.empty()) continue;
+    const std::string label = std::to_string(e-&gt;circuitId);
+    if (e-&gt;circuitLabel == label) continue;   // já mostra este circuito
+    e-&gt;circuitLabel = label;
+    syncElementAttributes(*e);                 // reescreve o atributo CIRCUITO no desenho
+}</code></pre>
+    <p><b>EL-CIRCUIT</b> (manual) hoje apenas anuncia que usará os tetos padrão da NBR 5410 e
+    delega para o automático — o ponto de extensão para uma UI de arrastar elementos entre
+    circuitos.</p>
+
+    <h3>Regras aplicadas (CircuitDistributor)</h3>
+    <span class="filepath">src/services/CircuitDistributor.h / .cpp</span>
+    <ul>
+      <li>Iluminação e tomadas <b>nunca</b> no mesmo circuito.</li>
+      <li>Iluminação agrupada até um teto de VA convencional (<code>maxLightingVA = 1200</code>).</li>
+      <li>Tomadas de uso geral (TUG) agrupadas até VA/contagem (<code>maxOutletVA = 1270</code>,
+      <code>maxOutletsPerCircuit = 10</code>).</li>
+      <li>Cada tomada de uso específico (TUE — chuveiro, A/C…) recebe o <b>seu próprio</b> circuito.</li>
+      <li>Seção de condutor e disjuntor seguem a escada mínima padrão
+      (<code>minConductorMM2()</code>, <code>breakerFor()</code>).</li>
+      <li>As fases são balanceadas em <i>round-robin</i> entre os condutores vivos disponíveis.</li>
+    </ul>
+
+    <h3>Como customizar a distribuição</h3>
+    <table>
+      <tr><th>Quero mudar…</th><th>Onde mexer</th></tr>
+      <tr><td>Tetos de VA / máximo de tomadas por circuito</td><td><code>DistributionOptions</code> (<code>maxLightingVA</code>, <code>maxOutletVA</code>, <code>maxOutletsPerCircuit</code>)</td></tr>
+      <tr><td>Seção mínima de condutor por tipo de circuito</td><td><code>CircuitDistributor::minConductorMM2()</code></td></tr>
+      <tr><td>Escolha do disjuntor por seção</td><td><code>CircuitDistributor::breakerFor()</code></td></tr>
+      <tr><td>Quantos condutores (F/N/PE/R) cada tipo carrega</td><td><code>conductorsFor()</code> em <code>WireCounts.h</code> — impacta a fiação (veja <a href="el-wire.html#condutores">EL-WIRE</a>)</td></tr>
+      <tr><td>Quadro que recebe os novos circuitos</td><td><code>DistributionOptions.targetPanelId</code> (-1 = primeiro/geral)</td></tr>
+    </table>
+
+    <div class="note"><b>Ordem recomendada de trabalho:</b> <kbd>EL-ROOM</kbd> →
+    <kbd>EL-CALC-LIGHT</kbd> / colocar tomadas → <kbd>EL-CIRCUIT-AUTO</kbd> →
+    <a href="roteamento.html"><kbd>EL-CONDUIT-AUTO</kbd></a> →
+    <a href="el-wire.html"><kbd>EL-WIRE-AUTO</kbd></a>. Cada etapa depende dos dados da anterior.</div>
+
+    <footer>open-electrical · Cálculo &amp; circuitos · continua em <a href="roteamento.html">Eletrodutos &amp; roteamento</a></footer>
+  </main>
+</div>
+</body>
+</html>

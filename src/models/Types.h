@@ -32,16 +32,26 @@ enum class RoomUsage : uint8_t {
 // Building function - governs default demand factors and load criteria.
 enum class RoomFunction : uint8_t { Residential, Commercial, Industrial };
 
+// Visual-task contrast/difficulty. Picks where inside the NBR 5413 illuminance
+// range the target E lands: Low -> lower bound, Medium -> mid, High -> upper.
+enum class TaskContrast : uint8_t { Low, Medium, High };
+
 // Concrete electrical element kinds.
 enum class ElementType : uint8_t { LightPoint, Outlet, Switch, Panel };
 
 // Outlet module composition. Each module can have its own mounting height.
-enum class OutletKind : uint8_t { Single, Duplex, Triplex };
+// WithSwitch2/DuplexWithSwitch1 are the NBR 5444 combined outlet+switch
+// symbols - always rendered at medium height regardless of the module's
+// stored mountingHeight (see Outlet::setKind).
+enum class OutletKind : uint8_t { Single, Duplex, Triplex, WithSwitch2, DuplexWithSwitch1 };
 
 // Outlet electrical purpose (NBR 5410 TUG/TUE distinction).
 enum class OutletPurpose : uint8_t { General, Specific };
 
-enum class SwitchKind : uint8_t { SinglePole, DoublePole, ThreeWay, FourWay };
+// Switch symbol variants (NBR 5444). One/Two/ThreeSection = number of keys on
+// the plate (independent gangs); ThreeWay = paralelo, FourWay = intermediario,
+// Bell = campainha push button. The section count is mirrored into Switch::gangs.
+enum class SwitchKind : uint8_t { OneSection, TwoSection, ThreeSection, ThreeWay, FourWay, Bell };
 
 // Circuit category, used by the automatic distributor and load schedule.
 enum class CircuitType : uint8_t { Lighting, GeneralOutlets, SpecificOutlets, Motor, Mixed };

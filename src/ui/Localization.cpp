@@ -150,6 +150,51 @@ std::map<std::string, std::string> Localization::builtinEnglish() {
         { "report.loadSchedule",  "Load Schedule" },
         { "report.bom",           "Bill of Materials" },
         { "report.sld",           "Single-line Diagram" },
+
+        { "msg.roomFirstCorner",  "Pick first room corner:" },
+        { "msg.roomNextCorner",   "Pick next corner [Undo] or press Enter to close:" },
+        { "msg.roomNeedCorners",  "A room needs at least 3 corners." },
+        { "msg.roomUndone",       "Last corner removed." },
+
+        { "height.label",         "Height" },
+        { "height.low",           "Low" },
+        { "height.medium",        "Medium" },
+        { "height.high",          "High" },
+
+        { "switch.sections",      "Sections" },
+        { "switch.command",       "Command" },
+        { "light.power",          "Power (e.g. 2x32W)" },
+        { "light.circuit",        "Circuit" },
+        { "light.lampCount",      "Lamp count" },
+        { "light.lampWatts",      "Power per lamp (W)" },
+
+        // Room dialog (EL-ROOM) - per-room luminotechnical parameters.
+        { "room.name",            "Name" },
+        { "room.type",            "Type" },
+        { "room.usageDetail",     "Specific use (optional)" },
+        { "room.function",        "Function" },
+        { "room.ceilingHeight",   "Ceiling height (m)" },
+        { "room.workPlane",       "Work plane height (m)" },
+        { "room.ceilingRefl",     "Ceiling reflectance (%)" },
+        { "room.wallRefl",        "Wall reflectance (%)" },
+        { "room.floorRefl",       "Floor reflectance (%)" },
+        { "room.contrast",        "Task contrast" },
+        { "room.mf",              "Maintenance factor (MF)" },
+        { "room.cu",              "Utilization factor (CU, 0 = auto)" },
+        { "room.area",            "Area (auto)" },
+
+        { "contrast.low",         "Low" },
+        { "contrast.medium",      "Medium" },
+        { "contrast.high",        "High" },
+
+        // Lighting run dialog (EL-CALC-LIGHT).
+        { "light.run.title",           "Automatic lighting" },
+        { "light.run.room",            "Room" },
+        { "light.run.allRooms",        "All rooms" },
+        { "light.run.luminaire",       "Luminaire model" },
+        { "light.run.customLuminaire", "Custom (type the values)" },
+        { "light.run.lumens",          "Luminous flux (lumens)" },
+        { "light.run.watts",           "Luminaire power (W)" },
     };
 }
 

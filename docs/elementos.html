@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elementos &amp; símbolos · open-electrical</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <a href="index.html"><img class="brand-logo" src="assets/open-electrical.svg" alt="open-electrical"></a>
+    <div class="tag">Plugin elétrico para BricsCAD · BRX / C++</div>
+    <nav>
+      <a href="index.html">Início</a>
+      <div class="group">Fundamentos</div>
+      <a href="fundamentos.html#requisitos">Requisitos</a>
+      <a href="fundamentos.html#estrutura">Estrutura do projeto</a>
+      <a href="fundamentos.html#tecnologias">Tecnologias</a>
+      <a href="fundamentos.html#logica">Lógica geral</a>
+      <div class="group">Comandos</div>
+      <a href="elementos.html" class="active">Elementos &amp; símbolos</a>
+      <a href="calculo.html">Cálculo &amp; circuitos</a>
+      <a href="roteamento.html">Eletrodutos &amp; roteamento</a>
+      <a href="el-wire.html">Fiação (EL-WIRE)</a>
+      <a href="relatorios.html">Relatórios &amp; remoção</a>
+      <div class="group">Interface</div>
+      <a href="interface.html">Paleta, config &amp; i18n</a>
+    </nav>
+  </aside>
+
+  <main>
+    <h1>Elementos &amp; símbolos</h1>
+    <p class="lead">Os comandos que <b>criam objetos no desenho</b>: ambientes, pontos de luz,
+    tomadas, interruptores e quadros. Cada elemento é um <i>bloco</i> NBR 5444 gerado
+    programaticamente pela <code>SymbolFactory</code>, ligado a um registro no modelo
+    (<code>ProjectData</code>) pelo <i>handle</i> da entidade.</p>
+
+    <div class="note">Todo comando desta página cria um objeto do modelo, insere o bloco
+    correspondente e chama <code>ProjectContext::instance().save()</code> — isto é o que
+    mantém o desenho e o modelo sincronizados após salvar/reabrir o .dwg.</div>
+
+    <h2 id="el-room">EL-ROOM — demarcar um ambiente</h2>
+    <span class="filepath">src/commands/RoomCommands.cpp — insertRoom()</span>
+    <p>Clique os cantos do ambiente um a um (mínimo 3). Uma linha elástica segue o cursor a
+    partir do canto anterior; <kbd>Enter</kbd> fecha o contorno e a palavra-chave
+    <kbd>Undo</kbd> remove o último canto. O plugin desenha a polilinha fechada na camada
+    <code>EL_ROOMS</code>, calcula a área e abre o <b>diálogo do ambiente</b> (nome, uso,
+    função, pé-direito e os parâmetros luminotécnicos).</p>
+<pre><code>Room room;
+room.id       = project.allocRoomId();
+room.boundary = corners;               // cantos coletados por pickCorners()
+room.recomputeArea(project.settings.unit);
+room.boundaryHandle = drawPolyline(kLayerRooms, corners, /*closed*/ true);
+if (!ui::showRoomDialog(room)) { project.nextRoomId--; return; }   // cancelar = rollback do id</code></pre>
+    <div class="note">O ambiente é a <b>base de tudo</b>: <kbd>EL-CALC-LIGHT</kbd>,
+    <kbd>EL-OUTLET-AUTO</kbd> e <kbd>EL-SWITCH-AUTO</kbd> iteram sobre <code>project.rooms</code>.
+    Sem ambiente, esses comandos avisam "No rooms defined" e não fazem nada.</div>
+
+    <h2 id="el-light">EL-LIGHT — ponto de luz manual</h2>
+    <span class="filepath">src/commands/ElementCommands.cpp — insertLight()</span>
+    <p>Escolhe o ponto, abre <code>showLightDialog</code> (teto ou arandela, potência, letra de
+    comando, circuito) e insere o bloco. Pontos de <b>teto</b> são referenciados ao pé-direito
+    (NBR 5444): o bloco é rebaixado a <code>Z = pé-direito − offsetFromCeiling</code>, lido do
+    ambiente sob o ponto (ou 2,8 m padrão). <b>Arandelas</b> giram para a perpendicular da
+    parede via <code>pickRotationOnWall</code>.</p>
+    <p>O texto do bloco (atributos) vem de <code>attrsFor()</code>: a luminária de teto grava
+    <code>POTENCIA</code>, <code>COMANDO</code> e <code>CIRCUITO</code> (o número do circuito é
+    desenhado entre hifens, ex.: <code>-3-</code>); a arandela grava só comando + circuito.</p>
+
+    <h2 id="el-outlet">EL-OUTLET / EL-OUTLET-AUTO — tomadas</h2>
+    <span class="filepath">src/commands/ElementCommands.cpp — insertOutlet() / insertOutletAuto()</span>
+    <p><b>EL-OUTLET</b> (manual): ponto → <code>showOutletDialog</code> (tipo, finalidade,
+    altura, VA) → gira na parede → insere. O bloco é escolhido por <code>outletBlockFor()</code>:
+    combos tomada+interruptor usam blocos fixos; as demais são uma <b>cadeia de 1–3 triângulos</b>
+    nomeada pelas alturas de montagem de cada módulo (convenção baixa/média/alta da NBR 5444).</p>
+    <p><b>EL-OUTLET-AUTO</b>: aplica o critério simplificado da NBR 5410 por ambiente —
+    ≥ 1 tomada a cada 5 m de perímetro; áreas molhadas (cozinha/área de serviço) a cada 3,5 m —
+    e distribui os pontos ao longo do contorno:</p>
+<pre><code>double spacing = (usage == Kitchen || usage == ServiceArea) ? 3.5 : 5.0;
+int    count   = std::max(1, (int)(perimetroM / spacing));
+// para cada k: posiciona no ponto (k+0.5)*passo ao longo do perímetro</code></pre>
+    <div class="warn">O critério automático é <b>simplificado</b> (só o espaçamento de perímetro).
+    Regras por cômodo (bancada de cozinha a cada 3,5 m independentemente da área, box de banheiro,
+    etc.) ainda não estão implementadas — ajuste em <code>insertOutletAuto()</code>.</div>
+
+    <h2 id="el-switch">EL-SWITCH / EL-SWITCH-AUTO — interruptores</h2>
+    <span class="filepath">src/commands/ElementCommands.cpp — insertSwitch() / insertSwitchAuto()</span>
+    <p><b>EL-SWITCH</b> (manual): ponto → <code>showSwitchDialog</code> → parede → insere. O bloco
+    depende do <code>SwitchKind</code>: 1/2/3 seções, paralelo (three-way), intermediário
+    (four-way) e campainha (<code>switchBlock()</code>). Cada seção vira um atributo
+    <code>COMANDO&lt;n&gt;</code>.</p>
+    <p><b>EL-SWITCH-AUTO</b>: coloca um interruptor de 1 seção junto à primeira abertura (porta)
+    de cada ambiente — ou, na falta, num vértice do contorno — e o <b>vincula</b> aos pontos de
+    luz daquele ambiente (<code>controlledLightHandles</code>).</p>
+
+    <h2 id="el-panel">EL-PANEL — quadro de distribuição</h2>
+    <span class="filepath">src/commands/ElementCommands.cpp — insertPanel()</span>
+    <p>O <b>primeiro</b> quadro do projeto é assumido como o geral (QGBT); os seguintes, como
+    quadros de distribuição (QD). <code>showPanelDialog</code> permite editar nome e o tipo
+    (aparente <code>EL_PANEL_SURFACE</code> ou embutido <code>EL_PANEL_FLUSH</code>).</p>
+<pre><code>bool anyPanel = /* já existe algum Panel? */;
+cfg.isMain = !anyPanel;               // 1º quadro = QGBT
+cfg.name   = cfg.isMain ? "QGBT" : "QD";</code></pre>
+
+    <h2 id="el-edit">EL-EDIT — editar um componente já inserido</h2>
+    <span class="filepath">src/commands/ElementCommands.cpp — editElement()</span>
+    <p>Selecione um componente do plugin; ele reabre o diálogo <b>daquele tipo</b> (aplicado a uma
+    cópia, para que Cancelar não altere nada) e grava as mudanças no modelo, no dicionário e no
+    símbolo. A regra de redesenho é a chave:</p>
+    <table>
+      <tr><th>Situação</th><th>O que EL-EDIT faz</th></tr>
+      <tr><td>O novo bloco é o <b>mesmo</b> (só mudou texto/potência/circuito)</td><td>Só reescreve os atributos <code>updateBlockAttributes(id, attrs)</code> — a referência é preservada</td></tr>
+      <tr><td>A <b>geometria</b> muda (ex.: interruptor ganha seção, tomada ganha módulo)</td><td>Apaga a entidade e recria o bloco na <b>mesma</b> posição e rotação</td></tr>
+    </table>
+    <div class="note">A mesma função <code>syncElementAttributes()</code> é usada por
+    <kbd>EL-CIRCUIT-AUTO</kbd> para empurrar o número de circuito recém-atribuído para o
+    atributo <code>CIRCUITO</code> dos símbolos já desenhados.</div>
+
+    <h2 id="simbolos">Como os símbolos são gerados (SymbolFactory)</h2>
+    <span class="filepath">src/services/SymbolFactory.h / .cpp</span>
+    <p>Em vez de um .dwg de símbolos, os blocos são <b>definidos no próprio desenho sob demanda</b>.
+    <code>SymbolFactory::ensure(db, nome)</code> cria o bloco se ainda não existir, então
+    <code>insertSymbol()</code> sempre encontra um símbolo real. Convenção local de todos os
+    símbolos: <b>+Y aponta para dentro do ambiente</b> (a parede é a linha <code>y=0</code>); a
+    rotação para casar com a parede real acontece na inserção (rotação da referência), não na
+    geometria.</p>
+    <table>
+      <tr><th>Constante</th><th>Nome do bloco</th><th>Símbolo NBR 5444</th></tr>
+      <tr><td><code>kLight</code> / <code>kLightWall</code></td><td>EL_LIGHT / EL_LIGHT_WALL</td><td>Ponto de luz teto (círculo) / arandela (meio-disco)</td></tr>
+      <tr><td><code>kOutletLow/Med/High</code></td><td>EL_OUTLET_L / _M / _H</td><td>Triângulo; preenchimento = altura (vazio/meia/cheia)</td></tr>
+      <tr><td>cadeia dinâmica</td><td>EL_OUTLET_L_M[_H]…</td><td>1–3 triângulos encadeados ápice-a-base</td></tr>
+      <tr><td><code>kSwitch1/2/3</code>, <code>kSwitch3Way/4Way</code>, <code>kSwitchBell</code></td><td>EL_SWITCH_*</td><td>Círculo deslocado da parede com haste; seções = fatias</td></tr>
+      <tr><td><code>kPanelSurface</code> / <code>kPanelFlush</code></td><td>EL_PANEL_SURFACE / _FLUSH</td><td>Retângulo 3:1 com triângulo interno; aparente/embutido</td></tr>
+    </table>
+
+    <h3>Versionamento de geometria — o campo mais importante ao editar símbolos</h3>
+    <div class="warn"><b>Sempre que alterar a geometria de qualquer símbolo, incremente
+    <code>SymbolFactory::kSymbolVersion</code>.</b> Cada bloco criado carrega esse número como
+    XData. Ao carregar, <code>ensure()</code> compara o carimbo do bloco (que vive dentro do .dwg,
+    não do .lrx) com <code>kSymbolVersion</code> e <b>redefine automaticamente</b> qualquer bloco
+    de uma build antiga — é o que faz a nova geometria aparecer em desenhos que já contêm os
+    blocos velhos. Esquecer disso = o usuário continua vendo o símbolo antigo mesmo após recompilar.</div>
+
+    <h3>Onde mexer para customizar um símbolo</h3>
+    <table>
+      <tr><th>Quero…</th><th>Onde mexer</th></tr>
+      <tr><td>Mudar o desenho de um símbolo</td><td><code>buildLight</code>/<code>buildSwitch</code>/<code>buildOutletChain</code>/<code>buildPanel</code> em <code>SymbolFactory.cpp</code> — e <b>subir</b> <code>kSymbolVersion</code></td></tr>
+      <tr><td>Escala geral dos símbolos</td><td><code>kSymUnit</code> (todas as dimensões derivam dele); inserção é 1:1 (<code>scaleFor()</code> retorna 1.0)</td></tr>
+      <tr><td>Quais atributos/textos cada bloco mostra</td><td><code>attrsFor()</code> em <code>ElementCommands.cpp</code> (a ordem casa com as definições de atributo do bloco)</td></tr>
+      <tr><td>Qual bloco representa cada configuração</td><td><code>blockNameFor()</code>, <code>outletBlockFor()</code>, <code>switchBlock()</code></td></tr>
+      <tr><td>Camada/cor de cada tipo</td><td><code>layerFor()</code> → <code>kLayerLighting/Outlets/Switches/Panels</code>; geometria é desenhada em "0" (BYBLOCK), herdando a cor da camada-alvo</td></tr>
+      <tr><td>Campos dos diálogos (tipo, altura, VA…)</td><td><code>src/ui/ElementDialogs.cpp</code> (wxWidgets) — veja <a href="interface.html">Interface</a></td></tr>
+    </table>
+
+    <footer>open-electrical · Elementos &amp; símbolos · continua em <a href="calculo.html">Cálculo &amp; circuitos</a></footer>
+  </main>
+</div>
+</body>
+</html>

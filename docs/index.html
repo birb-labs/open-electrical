@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>open-electrical · Documentação</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <a href="index.html"><img class="brand-logo" src="assets/open-electrical.svg" alt="open-electrical"></a>
+    <div class="tag">Plugin elétrico para BricsCAD · BRX / C++</div>
+    <nav>
+      <a href="index.html" class="active">Início</a>
+      <div class="group">Fundamentos</div>
+      <a href="fundamentos.html#requisitos">Requisitos</a>
+      <a href="fundamentos.html#estrutura">Estrutura do projeto</a>
+      <a href="fundamentos.html#tecnologias">Tecnologias</a>
+      <a href="fundamentos.html#logica">Lógica geral</a>
+      <div class="group">Comandos</div>
+      <a href="elementos.html">Elementos &amp; símbolos</a>
+      <a href="calculo.html">Cálculo &amp; circuitos</a>
+      <a href="roteamento.html">Eletrodutos &amp; roteamento</a>
+      <a href="el-wire.html">Fiação (EL-WIRE)</a>
+      <a href="relatorios.html">Relatórios &amp; remoção</a>
+      <div class="group">Interface</div>
+      <a href="interface.html">Paleta, config &amp; i18n</a>
+    </nav>
+  </aside>
+
+  <main>
+    <img class="hero-logo" src="assets/open-electrical.svg" alt="open-electrical">
+    <h1>Documentação</h1>
+    <p class="lead">Plugin nativo (BRX / C++) para o BricsCAD V26 que auxilia no projeto de
+    instalações elétricas residenciais conforme a NBR 5410 / NBR 5444.</p>
+
+    <p>Este site é o ponto de partida da documentação. Comece pelos <b>Fundamentos</b> para
+    entender o ambiente, a estrutura e a lógica geral, e depois vá para o mergulho profundo
+    no comando de <b>distribuição de fiação</b> — que é onde os "balões" de condutores
+    (aro + haste + trilho + símbolos de Fase, Neutro, Terra e Retorno) são desenhados.</p>
+
+    <div class="card-grid">
+      <a class="card" href="fundamentos.html#requisitos">
+        <h3>Requisitos</h3>
+        <p>SDK, BricsCAD, wxWidgets, toolchain e como compilar/instalar.</p>
+      </a>
+      <a class="card" href="fundamentos.html#estrutura">
+        <h3>Estrutura do projeto</h3>
+        <p>Pastas <code>src/</code>, camadas <code>commands/models/services</code> e recursos.</p>
+      </a>
+      <a class="card" href="fundamentos.html#tecnologias">
+        <h3>Tecnologias</h3>
+        <p>C++17, BRX (ObjectARX-compatível), Teigha/ODA, wxWidgets, CMake+Ninja.</p>
+      </a>
+      <a class="card" href="fundamentos.html#logica">
+        <h3>Lógica geral</h3>
+        <p>Como comandos, o modelo <code>ProjectData</code> e a persistência se encaixam.</p>
+      </a>
+      <a class="card" href="elementos.html">
+        <h3>Elementos &amp; símbolos ▸</h3>
+        <p>EL-ROOM, EL-LIGHT, EL-OUTLET, EL-SWITCH, EL-PANEL, EL-EDIT e a SymbolFactory (NBR 5444).</p>
+      </a>
+      <a class="card" href="calculo.html">
+        <h3>Cálculo &amp; circuitos ▸</h3>
+        <p>Método dos lúmens (EL-CALC-LIGHT) e distribuição de circuitos (EL-CIRCUIT-AUTO).</p>
+      </a>
+      <a class="card" href="roteamento.html">
+        <h3>Eletrodutos &amp; roteamento ▸</h3>
+        <p>EL-CONDUIT(-AUTO/-EDIT), EL-ROUTE-AUTO, o Router e os contornos de conexão.</p>
+      </a>
+      <a class="card" href="el-wire.html">
+        <h3>Fiação — EL-WIRE ▸</h3>
+        <p>Como o comando calcula os condutores e desenha os balões, e como alterá-lo.</p>
+      </a>
+      <a class="card" href="relatorios.html">
+        <h3>Relatórios &amp; remoção ▸</h3>
+        <p>EL-REPORT / quadro de cargas / unifilar / BOM, EL-DEL(-ROOM) e EL-UNDO.</p>
+      </a>
+      <a class="card" href="interface.html">
+        <h3>Interface, config &amp; i18n ▸</h3>
+        <p>A paleta (EL), EL-CONFIG, tradução em runtime e onde customizar cada interface.</p>
+      </a>
+    </div>
+
+    <div class="note">
+      <b>Status desta documentação.</b> Todas as seções estão escritas: fundamentos e os
+      <b>26 comandos</b>, agrupados em Elementos &amp; símbolos, Cálculo &amp; circuitos,
+      Eletrodutos &amp; roteamento, Fiação (EL-WIRE), Relatórios &amp; remoção e Interface.
+      Cada página termina com uma tabela <i>"como customizar"</i> apontando o arquivo/função a
+      editar. Uma referência rápida de todos os comandos está no fim da página de
+      <a href="interface.html#tabela">Interface</a>.
+    </div>
+
+    <footer>open-electrical · gerado como site estático (HTML/CSS puro, sem build). Abra
+    <code>docs/index.html</code> no navegador.</footer>
+  </main>
+</div>
+</body>
+</html>

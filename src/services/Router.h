@@ -10,6 +10,7 @@
 #pragma once
 
 #include "models/ProjectData.h"
+#include "services/WireCounts.h"
 
 namespace electrical {
 
@@ -30,9 +31,20 @@ public:
     // Routes conduits for every circuit that has none yet.
     static RoutingResult route(ProjectData& project, const RoutingOptions& opt = {});
 
-    // Pulls wires (one phase/neutral/ground set per circuit) through the conduits
-    // that carry it, filling Conduit::wires for the BOM and fill checks.
+    // Pulls wires through the conduits, filling Conduit::wires for the BOM and
+    // fill checks. Each conduit gets one conductor set per DISTINCT circuit that
+    // travels through it (see conduitCircuits), so a shared trunk accumulates.
     static void pullWires(ProjectData& project);
+
+    // Distinct circuit ids travelling through `conduit`: its own circuitIds, or,
+    // when empty (older/hand-drawn runs), those of the devices at its endpoints.
+    static std::vector<int> conduitCircuits(const ProjectData& project,
+                                            const Conduit& conduit);
+
+    // Total F/N/PE/R carried by `conduit` = sum of conductorsFor(type) over every
+    // distinct circuit it carries. Drives the wiring-distribution balloon.
+    static ConductorSet conduitConductors(const ProjectData& project,
+                                          const Conduit& conduit);
 };
 
 } // namespace electrical

@@ -5,12 +5,24 @@ namespace electrical {
 
 void Conduit::recomputeLength(Unit unit) {
     double len = 0.0;
-    for (size_t i = 1; i < path.size(); ++i) {
-        const Point3& a = path[i - 1];
-        const Point3& b = path[i];
-        len += std::sqrt((b.x - a.x) * (b.x - a.x) +
-                         (b.y - a.y) * (b.y - a.y) +
-                         (b.z - a.z) * (b.z - a.z));
+    // A curved 2-point run (bulge != 0) measures along its circular arc.
+    if (path.size() == 2 && std::fabs(bulge) > 1e-9) {
+        const Point3& a = path[0];
+        const Point3& b = path[1];
+        const double chord = std::sqrt((b.x - a.x) * (b.x - a.x) +
+                                       (b.y - a.y) * (b.y - a.y) +
+                                       (b.z - a.z) * (b.z - a.z));
+        const double theta = 4.0 * std::atan(std::fabs(bulge));   // included angle
+        const double s = std::sin(theta * 0.5);
+        len = s > 1e-9 ? (chord / (2.0 * s)) * theta : chord;      // arc = R*theta
+    } else {
+        for (size_t i = 1; i < path.size(); ++i) {
+            const Point3& a = path[i - 1];
+            const Point3& b = path[i];
+            len += std::sqrt((b.x - a.x) * (b.x - a.x) +
+                             (b.y - a.y) * (b.y - a.y) +
+                             (b.z - a.z) * (b.z - a.z));
+        }
     }
     lengthM = len * toMeters(unit);
 }
@@ -23,6 +35,18 @@ void Conduit::serialize(PropertyBag& bag) const {
     bag.putReal("diameterMM", diameterMM);
     bag.putInt("isVerticalDrop", isVerticalDrop ? 1 : 0);
     bag.putReal("lengthM", lengthM);
+    bag.putText("srcHandle", srcHandle);
+    bag.putText("dstHandle", dstHandle);
+    bag.putReal("bulge", bulge);
+
+    bag.putInt("mirror", mirror ? 1 : 0);
+    bag.putInt("circuitCount", static_cast<int64_t>(circuitIds.size()));
+    for (size_t i = 0; i < circuitIds.size(); ++i)
+        bag.putInt("circuit." + std::to_string(i), circuitIds[i]);
+
+    bag.putInt("annoCount", static_cast<int64_t>(annotationHandles.size()));
+    for (size_t i = 0; i < annotationHandles.size(); ++i)
+        bag.putText("anno." + std::to_string(i), annotationHandles[i]);
 
     bag.putInt("pathCount", static_cast<int64_t>(path.size()));
     for (size_t i = 0; i < path.size(); ++i)
@@ -46,6 +70,20 @@ void Conduit::deserialize(const PropertyBag& bag) {
     diameterMM     = bag.getReal("diameterMM", 20.0);
     isVerticalDrop = bag.getInt("isVerticalDrop", 0) != 0;
     lengthM        = bag.getReal("lengthM", 0.0);
+    srcHandle      = bag.getText("srcHandle");
+    dstHandle      = bag.getText("dstHandle");
+    bulge          = bag.getReal("bulge", 0.0);
+
+    mirror         = bag.getInt("mirror", 0) != 0;
+    circuitIds.clear();
+    const int64_t cc = bag.getInt("circuitCount", 0);
+    for (int64_t i = 0; i < cc; ++i)
+        circuitIds.push_back(static_cast<int>(bag.getInt("circuit." + std::to_string(i), -1)));
+
+    annotationHandles.clear();
+    const int64_t ac = bag.getInt("annoCount", 0);
+    for (int64_t i = 0; i < ac; ++i)
+        annotationHandles.push_back(bag.getText("anno." + std::to_string(i)));
 
     path.clear();
     const int64_t pc = bag.getInt("pathCount", 0);

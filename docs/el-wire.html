@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EL-WIRE / EL-WIRE-AUTO · open-electrical</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="layout">
+  <aside>
+    <a href="index.html"><img class="brand-logo" src="assets/open-electrical.svg" alt="open-electrical"></a>
+    <div class="tag">Plugin elétrico para BricsCAD · BRX / C++</div>
+    <nav>
+      <a href="index.html">Início</a>
+      <div class="group">Fundamentos</div>
+      <a href="fundamentos.html#requisitos">Requisitos</a>
+      <a href="fundamentos.html#estrutura">Estrutura do projeto</a>
+      <a href="fundamentos.html#tecnologias">Tecnologias</a>
+      <a href="fundamentos.html#logica">Lógica geral</a>
+      <div class="group">Comandos</div>
+      <a href="elementos.html">Elementos &amp; símbolos</a>
+      <a href="calculo.html">Cálculo &amp; circuitos</a>
+      <a href="roteamento.html">Eletrodutos &amp; roteamento</a>
+      <a href="el-wire.html" class="active">Fiação (EL-WIRE)</a>
+      <a href="#fluxo">&nbsp;&nbsp;Fluxo do comando</a>
+      <a href="#condutores">&nbsp;&nbsp;Contagem de condutores</a>
+      <a href="#baloes">&nbsp;&nbsp;Anatomia do balão</a>
+      <a href="#simbologias">&nbsp;&nbsp;Formato das simbologias</a>
+      <a href="#modificar">&nbsp;&nbsp;Como modificar</a>
+      <a href="#flip">&nbsp;&nbsp;EL-WIRE-FLIP</a>
+      <a href="relatorios.html">Relatórios &amp; remoção</a>
+      <div class="group">Interface</div>
+      <a href="interface.html">Paleta, config &amp; i18n</a>
+    </nav>
+  </aside>
+
+  <main>
+    <h1>EL-WIRE / EL-WIRE-AUTO</h1>
+    <p class="lead">O comando de distribuição de fiação: lê os circuitos, calcula quantos
+    condutores passam por cada eletroduto e desenha o "balão" (aro + haste + trilho + símbolos
+    de Fase / Neutro / Terra / Retorno) dentro de cada trecho.</p>
+
+    <h2 id="visao">Visão geral</h2>
+    <p>Há dois comandos, quase idênticos:</p>
+    <ul>
+      <li><code>EL-WIRE-AUTO</code> — faz todo o trabalho: puxa os fios no modelo e (re)desenha
+      os balões em todos os eletrodutos.</li>
+      <li><code>EL-WIRE</code> — apenas imprime uma mensagem e chama <code>EL-WIRE-AUTO</code>;
+      existe para dar um nome "sem sufixo" ao usuário.</li>
+    </ul>
+    <div class="note">Pré-requisitos no desenho: já existir pelo menos um <b>circuito</b>
+    (<kbd>EL-CIRCUIT-AUTO</kbd>) e os <b>eletrodutos</b> (<kbd>EL-CONDUIT-AUTO</kbd>). Um
+    eletroduto sem circuito associado não carrega condutores e, portanto, não recebe balão.</div>
+
+    <h2 id="fluxo">Fluxo do comando</h2>
+    <span class="filepath">src/commands/CircuitCommands.cpp — routeWireAuto()</span>
+<pre><code>void routeWireAuto() {
+    ProjectData&amp; project = ProjectContext::instance().project();
+    if (project.conduits.empty()) { acutPrintf(_T("\nNo conduits yet...")); return; }
+
+    UndoGroup undo(_T("EL-WIRE-AUTO"));
+    Router::pullWires(project);                 // 1. calcula os fios (modelo)
+    const int drawn = refreshWiringBalloons(project);  // 2. (re)desenha os balões
+    ProjectContext::instance().save();          // 3. persiste
+
+    acutPrintf(_T("\nEL-WIRE: %d conduit(s), %d circuit(s), %d wiring tag(s) drawn (%.2f m).\n"),
+               (int)project.conduits.size(), (int)project.circuits.size(), drawn, totalWire);
+}</code></pre>
+    <p>A linha impressa é o seu <b>diagnóstico</b>: se aparecer <code>0 circuit(s)</code> ou
+    <code>0 wiring tag(s)</code>, o problema é de dados (rode <kbd>EL-CIRCUIT-AUTO</kbd> antes),
+    não de desenho.</p>
+
+    <h3>Idempotência e "troncos" (trunk union)</h3>
+    <p><code>refreshWiringBalloons</code> primeiro <b>apaga</b> os balões antigos (guardados em
+    <code>Conduit::annotationHandles</code>) e então agrupa eletrodutos que se sobrepõem no
+    mesmo ponto médio — assim um trecho compartilhado por 2+ circuitos mostra <b>um</b> balão
+    com a <b>soma</b> dos circuitos.</p>
+    <span class="filepath">src/commands/CircuitCommands.cpp — refreshWiringBalloons()</span>
+<pre><code>// apaga balões anteriores (sem órfãos)
+for (auto&amp; c : project.conduits) {
+    for (const auto&amp; h : c.annotationHandles) { AcDbObjectId id;
+        if (entityIdByHandle(h, id)) eraseEntity(id); }
+    c.annotationHandles.clear();
+}
+// agrupa trechos coincidentes e desenha 1 balão com a UNIÃO dos circuitos
+const double eps = 0.02;
+... para cada grupo: rep.circuitIds = uniao; drawWiringBalloon(project, rep); ...</code></pre>
+
+    <h2 id="condutores">Contagem de condutores (por circuito)</h2>
+    <p>A regra-chave: o número de <b>componentes</b> de um circuito <b>não</b> multiplica os
+    condutores; o que soma é o número de <b>circuitos distintos</b> que passam pelo eletroduto.
+    A quantidade de fios de cada circuito depende do seu <b>tipo</b>:</p>
+    <span class="filepath">src/services/WireCounts.h</span>
+<pre><code>struct ConductorSet { int phase, neutral, ground, retorno; /* + operator+= e total() */ };
+
+inline ConductorSet conductorsFor(CircuitType type) {
+    switch (type) {
+        case CircuitType::Lighting:        return { 1, 1, 0, 1 };  // F + N + Retorno
+        case CircuitType::GeneralOutlets:  return { 1, 1, 1, 0 };  // F + N + Terra
+        case CircuitType::SpecificOutlets: return { 1, 1, 1, 0 };
+        case CircuitType::Motor:           return { 1, 1, 1, 0 };
+        case CircuitType::Mixed:           return { 1, 1, 1, 1 };
+    }
+    return { 1, 1, 1, 0 };
+}</code></pre>
+    <table>
+      <tr><th>Tipo de circuito</th><th>F</th><th>N</th><th>PE</th><th>R</th></tr>
+      <tr><td>Iluminação</td><td>1</td><td>1</td><td>0</td><td>1</td></tr>
+      <tr><td>Tomadas (geral/específica) / Motor</td><td>1</td><td>1</td><td>1</td><td>0</td></tr>
+      <tr><td>Misto</td><td>1</td><td>1</td><td>1</td><td>1</td></tr>
+    </table>
+    <p>Quais circuitos passam por um eletroduto e a soma total dos condutores são resolvidos
+    no <code>Router</code>:</p>
+    <span class="filepath">src/services/Router.cpp</span>
+<pre><code>// circuitos que passam por um eletroduto: os seus próprios circuitIds,
+// ou (trechos antigos) os circuitos dos componentes das pontas.
+std::vector&lt;int&gt; Router::conduitCircuits(const ProjectData&amp;, const Conduit&amp;);
+
+// soma de conductorsFor(tipo) sobre cada circuito distinto do eletroduto
+ConductorSet Router::conduitConductors(const ProjectData&amp; p, const Conduit&amp; c) {
+    ConductorSet total;
+    for (int cid : conduitCircuits(p, c))
+        total += conductorsFor(circuitById(p, cid)->type);
+    return total;
+}</code></pre>
+
+    <h2 id="baloes">Anatomia do balão</h2>
+    <p>Todo o desenho do balão vive numa única função:
+    <code>drawWiringBalloon(project, conduit)</code>. Ela é composta por: <b>aro</b> (o "C" no
+    eletroduto) → <b>haste</b> → <b>trilho branco</b> → um <b>símbolo por condutor</b>. Tudo é
+    posicionado a partir do ponto médio <code>M</code> do eletroduto e escalado à unidade dos
+    símbolos (~0.09).</p>
+    <span class="filepath">src/commands/CircuitCommands.cpp — drawWiringBalloon() (métricas)</span>
+<pre><code>const double s     = c.mirror ? -1.0 : 1.0;  // espelhamento horizontal (EL-WIRE-FLIP)
+const double ringR = 0.028;   // raio do aro (o "C")
+const double tH    = 0.05;    // meia-altura do símbolo vertical
+const double barW  = 0.02;    // largura dos retângulos verticais (todos iguais)
+const double hc    = 0.045;   // meio-comprimento das barras horizontais (T / L)
+const double sp    = 0.13;    // espaçamento entre símbolos
+const double railY = M.y + ringR + 0.085;   // altura do trilho</code></pre>
+
+    <h3>O aro (o "C")</h3>
+    <p>É um arco de ~300° (abertura de ~60°) cuja "boca" aponta para a haste/trilho. Diminuir
+    <code>ringR</code> encolhe o aro; aumentar <code>gapHalf</code> abre mais o "C".</p>
+<pre><code>const double gapHalf = 30.0 * kPi / 180.0;         // metade da abertura → "C" mais/menos fechado
+const double a0 = gapHalf, a1 = 2.0 * kPi - gapHalf;
+for (int i = 0; i &lt;= 16; ++i) {
+    const double a = a0 + (a1 - a0) * i / 16;
+    arc.emplace_back(M.x + s * ringR * std::cos(a), M.y + ringR * std::sin(a), 0.0);
+}
+H.push_back(drawColoredPolyline(kLayerWiring, arc, 255, 255, 255));  // branco</code></pre>
+
+    <h3>Haste + trilho</h3>
+<pre><code>const double railX0  = M.x + s * (ringR + 0.03);
+const double railLen = cs.total() * sp + 0.05;      // comprimento ∝ nº de símbolos
+const double railX1  = railX0 + s * railLen;
+// haste: do aro ao trilho ; trilho: linha branca horizontal
+drawColoredPolyline(kLayerWiring, { {M.x + s*ringR, M.y}, {railX0, railY} }, 255,255,255);
+drawColoredPolyline(kLayerWiring, { {railX0, railY},      {railX1, railY} }, 255,255,255);</code></pre>
+
+    <h2 id="simbologias">Formato de cada simbologia</h2>
+    <p>Cada condutor é um glifo <b>volumétrico</b> (retângulos preenchidos via
+    <code>drawSolidRect</code>). Dois helpers desenham as barras:</p>
+<pre><code>auto vbar = [&amp;](double y0, double y1, int r,int g,int b){   // barra vertical
+    drawSolidRect(kLayerWiring, x, (y0+y1)/2, barW/2, |y1-y0|/2, r,g,b); };
+auto hbar = [&amp;](double x0, double x1, double y, int r,int g,int b){ // barra horizontal
+    drawSolidRect(kLayerWiring, (x0+x1)/2, y, |x1-x0|/2, barW/2, r,g,b); };</code></pre>
+
+    <div class="glyph-demo">
+      <figure>
+        <svg width="120" height="96" viewBox="0 0 120 96">
+          <line x1="8" y1="58" x2="112" y2="58" stroke="#ffffff" stroke-width="2"/>
+          <rect x="55" y="32" width="10" height="52" fill="#ff0000"/>
+        </svg>
+        <figcaption><span class="swatch s-red"></span>Fase — 1 barra vertical</figcaption>
+      </figure>
+      <figure>
+        <svg width="120" height="96" viewBox="0 0 120 96">
+          <line x1="8" y1="58" x2="112" y2="58" stroke="#ffffff" stroke-width="2"/>
+          <rect x="55" y="32" width="10" height="52" fill="#00ffff"/>
+          <rect x="20" y="28" width="40" height="8" fill="#00ffff"/>
+        </svg>
+        <figcaption><span class="swatch s-cyan"></span>Neutro — "L" invertido, perna à esquerda</figcaption>
+      </figure>
+      <figure>
+        <svg width="120" height="96" viewBox="0 0 120 96">
+          <line x1="8" y1="58" x2="112" y2="58" stroke="#ffffff" stroke-width="2"/>
+          <rect x="55" y="32" width="10" height="52" fill="#00ff00"/>
+          <rect x="38" y="28" width="44" height="8" fill="#00ff00"/>
+        </svg>
+        <figcaption><span class="swatch s-green"></span>Terra — "T" (barra centralizada no topo)</figcaption>
+      </figure>
+      <figure>
+        <svg width="120" height="96" viewBox="0 0 120 96">
+          <line x1="8" y1="58" x2="112" y2="58" stroke="#ffffff" stroke-width="2"/>
+          <rect x="55" y="32" width="10" height="26" fill="#f5f5f5"/>
+        </svg>
+        <figcaption><span class="swatch s-white"></span>Retorno — metade superior da Fase</figcaption>
+      </figure>
+    </div>
+
+    <span class="filepath">src/commands/CircuitCommands.cpp — drawWiringBalloon() (glifos)</span>
+<pre><code>auto glyph = [&amp;](int r,int g,int b, int kind) {
+    switch (kind) {
+        case 0:  vbar(railY - tH, railY + tH, r,g,b); break;                  // Fase
+        case 1:  vbar(railY - tH, railY + tH, r,g,b);                          // Neutro
+                 hbar(x, x - s*2.0*hc, railY + tH, r,g,b); break;             //   topo → esquerda
+        case 2:  vbar(railY, railY + tH, r,g,b); break;                        // Retorno (metade sup.)
+        case 3:  vbar(railY - tH, railY + tH, r,g,b);                          // Terra
+                 hbar(x - hc, x + hc, railY + tH, r,g,b); break;              //   topo centralizado
+    }
+    x += s * sp;
+};
+for (int i=0;i&lt;cs.phase;  ++i) glyph(255, 0,   0,   0);  // F  vermelho
+for (int i=0;i&lt;cs.neutral;++i) glyph(0,   255, 255, 1);  // N  ciano
+for (int i=0;i&lt;cs.ground; ++i) glyph(0,   255, 0,   3);  // PE verde
+for (int i=0;i&lt;cs.retorno;++i) glyph(255, 255, 255, 2);  // R  branco</code></pre>
+
+    <h2 id="modificar">Como modificar o comportamento</h2>
+    <table>
+      <tr><th>Quero mudar…</th><th>Onde mexer</th></tr>
+      <tr><td>Quantos F/N/PE/R por tipo de circuito</td><td><code>conductorsFor()</code> em <code>WireCounts.h</code></td></tr>
+      <tr><td>Cor de cada condutor</td><td>Os <code>glyph(r,g,b,…)</code> nos <code>for</code> finais (RGB 0–255)</td></tr>
+      <tr><td>Formato de um símbolo</td><td>O <code>switch(kind)</code> dentro de <code>glyph</code> (adicionar/mover <code>vbar</code>/<code>hbar</code>)</td></tr>
+      <tr><td>Tamanho do aro / abertura do "C"</td><td><code>ringR</code> / <code>gapHalf</code></td></tr>
+      <tr><td>Largura/altura das barras, espaçamento</td><td><code>barW</code>, <code>tH</code>, <code>hc</code>, <code>sp</code></td></tr>
+      <tr><td>Onde o balão é ancorado</td><td><code>pathMidpoint()</code> (ponto médio) e <code>railY</code></td></tr>
+      <tr><td>Camada/estilo das entidades</td><td>Layer <code>kLayerWiring</code> (<code>EL_WIRING</code>)</td></tr>
+    </table>
+
+    <h3>Exemplo: adicionar uma barra inferior ao Retorno</h3>
+<pre><code>case 2:  // Retorno
+    vbar(railY, railY + tH, r,g,b);            // metade superior (atual)
+    hbar(x - hc*0.6, x + hc*0.6, railY, r,g,b); // + traço na linha do trilho (novo)
+    break;</code></pre>
+    <div class="warn"><b>Atenção — renderização.</b> Use <code>drawSolidRect</code> (AcDbSolid,
+    preenchido) para as barras. Uma tentativa anterior com polilinha de largura constante
+    (<code>setConstantWidth</code>) fazia o <code>EL-WIRE</code> abortar e <b>nenhum</b> balão
+    aparecia. <code>drawSolidRect</code> é o mesmo primitivo de preenchimento dos símbolos das
+    tomadas e renderiza de forma confiável.</div>
+
+    <h2 id="flip">EL-WIRE-FLIP (espelhar o balão)</h2>
+    <p>Seleciona um eletroduto e espelha o balão para o outro lado do trecho (útil para o balão
+    não colidir com geometria vizinha). Alterna <code>Conduit::mirror</code> (persistido) e
+    redesenha só aquele balão — todas as coordenadas <code>x</code> são multiplicadas por
+    <code>s = mirror ? -1 : 1</code>.</p>
+    <span class="filepath">src/commands/CircuitCommands.cpp — flipWiring()</span>
+<pre><code>Conduit* c = conduitByEntity(project, id);      // eletroduto escolhido
+c-&gt;mirror = !c-&gt;mirror;                          // alterna o espelho
+/* apaga os handles antigos */ c-&gt;annotationHandles.clear();
+drawWiringBalloon(project, *c);                  // redesenha espelhado
+ProjectContext::instance().save();</code></pre>
+
+    <footer>open-electrical · EL-WIRE / EL-WIRE-AUTO · continuação em outras seções</footer>
+  </main>
+</div>
+</body>
+</html>

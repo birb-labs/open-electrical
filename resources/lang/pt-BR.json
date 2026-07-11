@@ -50,5 +50,48 @@
   "report.legend": "Legenda",
   "report.loadSchedule": "Quadro de Cargas",
   "report.bom": "Lista de Materiais",
-  "report.sld": "Diagrama Unifilar"
+  "report.sld": "Diagrama Unifilar",
+
+  "msg.roomFirstCorner": "Selecione o primeiro canto do comodo:",
+  "msg.roomNextCorner": "Selecione o proximo canto [Desfazer] ou Enter para fechar:",
+  "msg.roomNeedCorners": "Um comodo precisa de ao menos 3 cantos.",
+  "msg.roomUndone": "Ultimo canto removido.",
+
+  "height.label": "Altura",
+  "height.low": "Baixo",
+  "height.medium": "Medio",
+  "height.high": "Alto",
+
+  "switch.sections": "Secoes",
+  "switch.command": "Comando",
+  "light.power": "Potencia (ex.: 2x32W)",
+  "light.circuit": "Circuito",
+  "light.lampCount": "Quantidade de lampadas",
+  "light.lampWatts": "Potencia individual (W)",
+
+  "room.name": "Nome",
+  "room.type": "Tipo",
+  "room.usageDetail": "Uso especifico (opcional)",
+  "room.function": "Funcao",
+  "room.ceilingHeight": "Altura do teto (m)",
+  "room.workPlane": "Altura do plano de trabalho (m)",
+  "room.ceilingRefl": "Refletancia do teto (%)",
+  "room.wallRefl": "Refletancia das paredes (%)",
+  "room.floorRefl": "Refletancia do piso (%)",
+  "room.contrast": "Contraste da tarefa",
+  "room.mf": "Fator de manutencao (MF)",
+  "room.cu": "Fator de utilizacao (CU, 0 = automatico)",
+  "room.area": "Area (auto)",
+
+  "contrast.low": "Baixo",
+  "contrast.medium": "Medio",
+  "contrast.high": "Alto",
+
+  "light.run.title": "Iluminacao automatica",
+  "light.run.room": "Comodo",
+  "light.run.allRooms": "Todos os comodos",
+  "light.run.luminaire": "Modelo de luminaria",
+  "light.run.customLuminaire": "Personalizado (digite os valores)",
+  "light.run.lumens": "Fluxo luminoso (lumens)",
+  "light.run.watts": "Potencia da luminaria (W)"
 }

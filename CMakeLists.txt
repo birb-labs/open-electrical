@@ -153,6 +153,31 @@ install(TARGETS open_electrical
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/resources"
     DESTINATION open-electrical)
 
+# -----------------------------------------------------------------------------
+#  Unit tests (BRX-free core: polygon math, lumen method, Room serialization).
+#  These deliberately link NO BRX/wxWidgets - only the platform-independent
+#  translation units - so they build and run headless.
+#    Build + run:  cmake --build build --target check
+# -----------------------------------------------------------------------------
+enable_testing()
+add_executable(oe_tests EXCLUDE_FROM_ALL
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests/tests.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/models/Room.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/services/LightingCalculator.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/utilities/PolyMath.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/utilities/ElementOutline.cpp")
+target_include_directories(oe_tests PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/tests")
+add_test(NAME oe_tests COMMAND oe_tests)
+
+# `check` builds the tests (EXCLUDE_FROM_ALL keeps the plugin build independent)
+# and runs them, failing the invocation if any test fails.
+add_custom_target(check
+    COMMAND oe_tests
+    DEPENDS oe_tests
+    COMMENT "Running open-electrical unit tests")
+
 message(STATUS "open-electrical configured:")
 message(STATUS "  BRX SDK root  : ${BRX_SDK_ROOT}")
 message(STATUS "  BricsCAD root : ${BRICSCAD_ROOT}")

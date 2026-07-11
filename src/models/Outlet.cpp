@@ -4,13 +4,20 @@ namespace electrical {
 
 void Outlet::setKind(OutletKind k) {
     kind = k;
-    const size_t want = (k == OutletKind::Single) ? 1
-                      : (k == OutletKind::Duplex) ? 2 : 3;
+    // The combined outlet+switch symbols are a single medium-height outlet
+    // point (see SymbolFactory::buildOutletWithSwitch); "duplex" for the
+    // 1-section-switch variant is conveyed by the module purpose/tag, not by
+    // an extra drawn triangle (the NBR 5444 geometry for both combo rows is
+    // described identically: "identica a tomada media").
+    const size_t want = (k == OutletKind::Triplex) ? 3
+                      : (k == OutletKind::Duplex)  ? 2 : 1;
     if (modules.size() < want) {
         while (modules.size() < want) modules.emplace_back();
     } else if (modules.size() > want) {
         modules.resize(want);
     }
+    if (k == OutletKind::WithSwitch2 || k == OutletKind::DuplexWithSwitch1)
+        for (auto& m : modules) m.mountingHeight = 1.30;  // mandatory medium height
 }
 
 double Outlet::totalVA() const {

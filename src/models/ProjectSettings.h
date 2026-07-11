@@ -41,6 +41,10 @@ public:
     std::string      utilityProvider    = "NeoEnergia";
     std::vector<PowerUtility> providers;            // includes predefined + user
 
+    // Luminotechnical parameters are NOT global: they live per room (see Room -
+    // reflectances, contrast, MF, CU, work-plane and ceiling heights). The lumen
+    // method reads them straight off each Room; there is no project-wide default.
+
     // ---- UI language (commands stay English; UI text is localized) -------
     std::string      uiLanguage         = "en";     // "en" | "pt-BR" | "es"
 

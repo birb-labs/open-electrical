@@ -11,6 +11,8 @@ void ElectricalElement::serializeBase(PropertyBag& bag) const {
     bag.putInt("roomId", roomId);
     bag.putInt("circuitId", circuitId);
     bag.putReal("powerVA", powerVA);
+    bag.putText("noteLetter", noteLetter);
+    bag.putText("circuitLabel", circuitLabel);
 }
 
 void ElectricalElement::deserializeBase(const PropertyBag& bag) {
@@ -22,6 +24,8 @@ void ElectricalElement::deserializeBase(const PropertyBag& bag) {
     roomId         = static_cast<int>(bag.getInt("roomId", -1));
     circuitId      = static_cast<int>(bag.getInt("circuitId", -1));
     powerVA        = bag.getReal("powerVA", 0.0);
+    noteLetter     = bag.getText("noteLetter");
+    circuitLabel   = bag.getText("circuitLabel");
 }
 
 } // namespace electrical

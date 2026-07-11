@@ -34,10 +34,20 @@ void Room::serialize(PropertyBag& bag) const {
     bag.putInt("id", id);
     bag.putText("name", name);
     bag.putEnum("usage", usage);
+    bag.putText("usageDetail", usageDetail);
     bag.putEnum("function", function);
     bag.putReal("ceilingHeight", ceilingHeight);
     bag.putReal("areaM2", areaM2);
     bag.putText("boundaryHandle", boundaryHandle);
+
+    // Luminotechnical parameters (per room).
+    bag.putReal("ceilingRefl", ceilingReflectance);
+    bag.putReal("wallRefl", wallReflectance);
+    bag.putReal("floorRefl", floorReflectance);
+    bag.putEnum("contrast", contrast);
+    bag.putReal("workPlane", workPlaneHeight);
+    bag.putReal("mf", maintenanceFactor);
+    bag.putReal("cu", utilizationFactor);
 
     bag.putInt("vertexCount", static_cast<int64_t>(boundary.size()));
     for (size_t i = 0; i < boundary.size(); ++i)
@@ -58,10 +68,20 @@ void Room::deserialize(const PropertyBag& bag) {
     id            = static_cast<int>(bag.getInt("id", -1));
     name          = bag.getText("name", "Room");
     usage         = bag.getEnum("usage", RoomUsage::LivingRoom);
+    usageDetail   = bag.getText("usageDetail");
     function      = bag.getEnum("function", RoomFunction::Residential);
     ceilingHeight = bag.getReal("ceilingHeight", 2.80);
     areaM2        = bag.getReal("areaM2", 0.0);
     boundaryHandle = bag.getText("boundaryHandle");
+
+    // Luminotechnical parameters - defaults keep older drawings working.
+    ceilingReflectance = bag.getReal("ceilingRefl", 0.70);
+    wallReflectance    = bag.getReal("wallRefl", 0.50);
+    floorReflectance   = bag.getReal("floorRefl", 0.20);
+    contrast           = bag.getEnum("contrast", TaskContrast::Medium);
+    workPlaneHeight    = bag.getReal("workPlane", 0.75);
+    maintenanceFactor  = bag.getReal("mf", 0.80);
+    utilizationFactor  = bag.getReal("cu", 0.60);
 
     boundary.clear();
     const int64_t vc = bag.getInt("vertexCount", 0);

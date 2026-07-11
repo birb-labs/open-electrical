@@ -7,6 +7,7 @@ void Panel::serialize(PropertyBag& bag) const {
     bag.putText("type", typeTag());
     bag.putText("name", name);
     bag.putInt("isMain", isMain ? 1 : 0);
+    bag.putInt("embedded", embedded ? 1 : 0);
     bag.putInt("parentPanelId", parentPanelId);
     bag.putReal("demandFactor", demandFactor);
     bag.putInt("circuitCount", static_cast<int64_t>(circuitIds.size()));
@@ -18,6 +19,7 @@ void Panel::deserialize(const PropertyBag& bag) {
     deserializeBase(bag);
     name          = bag.getText("name", "QD-1");
     isMain        = bag.getInt("isMain", 0) != 0;
+    embedded      = bag.getInt("embedded", 0) != 0;
     parentPanelId = static_cast<int>(bag.getInt("parentPanelId", -1));
     demandFactor  = bag.getReal("demandFactor", 1.0);
     circuitIds.clear();

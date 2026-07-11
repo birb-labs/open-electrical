@@ -48,6 +48,20 @@ MainPalettePanel::MainPalettePanel(wxWindow* parent)
     addButton(root, "menu.circuits", "EL-CIRCUIT-AUTO");
     addButton(root, "config.conduitMat", "EL-CONDUIT-AUTO");
     addButton(root, "menu.reports",  "EL-REPORT");
+    root->Add(new wxStaticLine(this), 0, wxEXPAND | wxALL, 4);
+
+    // Editing / removal.
+    const struct { const char* label; wxString cmd; } editBtns[] = {
+        { "Edit conduit", "EL-CONDUIT-EDIT" },
+        { "Delete",       "EL-DEL"          },
+        { "Delete room",  "EL-DEL-ROOM"     },
+    };
+    for (const auto& e : editBtns) {
+        auto* btn = new wxButton(this, wxID_ANY, e.label);
+        const wxString cmd = e.cmd;
+        btn->Bind(wxEVT_BUTTON, [this, cmd](wxCommandEvent&) { run(cmd); });
+        root->Add(btn, 0, wxEXPAND | wxLEFT | wxRIGHT | wxBOTTOM, 6);
+    }
 
     SetSizer(root);
     refresh();

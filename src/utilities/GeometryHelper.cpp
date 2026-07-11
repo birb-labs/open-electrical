@@ -1,4 +1,5 @@
 #include "utilities/GeometryHelper.h"
+#include "utilities/PolyMath.h"
 #include <cmath>
 #include <limits>
 
@@ -22,16 +23,9 @@ bool polylineVertices(AcDbObjectId polyId, std::vector<Point3>& out) {
 }
 
 bool pointInPolygon(const Point3& pt, const std::vector<Point3>& poly) {
-    bool inside = false;
-    const size_t n = poly.size();
-    for (size_t i = 0, j = n - 1; i < n; j = i++) {
-        const double yi = poly[i].y, yj = poly[j].y;
-        const double xi = poly[i].x, xj = poly[j].x;
-        const bool crosses = ((yi > pt.y) != (yj > pt.y)) &&
-            (pt.x < (xj - xi) * (pt.y - yi) / (yj - yi + 1e-12) + xi);
-        if (crosses) inside = !inside;
-    }
-    return inside;
+    // The actual ray-casting lives in the BRX-free polymath module (so it can be
+    // unit-tested off-CAD); this is the thin AcDb-side alias other services use.
+    return polymath::pointInPolygon(pt, poly);
 }
 
 Point3 centroid(const std::vector<Point3>& poly) {
