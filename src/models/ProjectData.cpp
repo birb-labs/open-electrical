@@ -16,9 +16,7 @@ Panel* ProjectData::findPanel(int id) {
     for (auto& e : elements) {
         if (e->type == ElementType::Panel) {
             auto* p = static_cast<Panel*>(e.get());
-            // Panels reuse the room-scoped id via the base tag; match on the
-            // parentPanelId chain is done by callers. Here we match by tag id.
-            if (p->parentPanelId == id) return p;
+            if (p->id == id) return p;   // match on the panel's own id
         }
     }
     return nullptr;
@@ -43,7 +41,7 @@ void ProjectData::clear() {
     circuits.clear();
     conduits.clear();
     elements.clear();
-    nextRoomId = nextCircuitId = nextConduitId = 1;
+    nextRoomId = nextCircuitId = nextConduitId = nextPanelId = 1;
 }
 
 } // namespace electrical

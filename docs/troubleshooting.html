@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Problemas comuns do open-electrical: cache do .lrx, símbolos desatualizados, balões de fiação ausentes, crash do wxWidgets — sintoma, causa e solução.">
+<title>Problemas comuns · open-electrical</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+<link rel="stylesheet" href="style.css">
+<script src="nav.js" defer></script>
+</head>
+<body>
+<div class="layout">
+  <aside data-nav></aside>
+
+  <main>
+    <h1>Problemas comuns</h1>
+    <p class="lead">Sintoma → causa → solução. Os diagnósticos que aparecem espalhados pelas
+    outras páginas, reunidos aqui.</p>
+
+    <h2 id="carga">Carga do módulo</h2>
+
+    <h3>Recompilei, mas o BricsCAD continua com o comportamento antigo</h3>
+    <p><b>Causa:</b> o BricsCAD faz cache do módulo em nível de <b>processo</b>. Um novo
+    <kbd>APPLOAD</kbd> sobre o mesmo processo pode continuar executando o binário anterior.</p>
+    <p><b>Solução:</b> <b>feche e reabra o BricsCAD</b> depois de recompilar. Foi a raiz de uma
+    longa investigação de "stale load" — detalhes em
+    <a href="../docs-legacy/BRICSCAD-BRX-LINUX.md"><code>docs-legacy/BRICSCAD-BRX-LINUX.md</code></a>.</p>
+
+    <h3>"Unknown command" ao digitar um EL-…</h3>
+    <p><b>Causa:</b> o módulo não está carregado, ou o comando não existe. Atenção:
+    <code>EL-LIGHT-AUTO</code> <b>não</b> é um comando registrado — o cálculo de iluminação é
+    <kbd>EL-CALC-LIGHT</kbd> (veja <a href="calculo.html#el-calc-light">Cálculo</a>).</p>
+    <p><b>Solução:</b> confirme o carregamento (a mensagem <code>open-electrical loaded</code>
+    aparece no início) e consulte a <a href="interface.html#tabela">referência rápida</a> para o
+    nome exato. Os 26 comandos registrados estão em <code>src/commands/Commands.cpp</code>.</p>
+
+    <h3>O host trava (crash) ao carregar no Linux</h3>
+    <p><b>Causa:</b> dois runtimes wxWidgets no mesmo processo — o do BricsCAD (3.1) e um wx
+    compartilhado do sistema linkado pelo módulo.</p>
+    <p><b>Solução:</b> o build linka um wxWidgets <b>privado e estático</b>
+    (<code>wxstatic-oel-*</code>) e isola os símbolos com um <i>version-script</i>. Se você mudou o
+    CMake, garanta que não voltou a linkar um wx compartilhado. Contexto completo em
+    <a href="fundamentos.html#requisitos">Fundamentos</a> e no doc legado do BRX no Linux.</p>
+
+    <h2 id="simbolos-desatualizados">Símbolos e geometria</h2>
+
+    <h3>Alterei um símbolo no código, mas o desenho mostra o antigo</h3>
+    <p><b>Causa:</b> os blocos NBR 5444 são definidos <b>dentro do .dwg</b>. Um desenho que já
+    continha o bloco guarda a geometria antiga; recompilar o plugin não reescreve o bloco
+    sozinho.</p>
+    <p><b>Solução:</b> <b>incremente <code>SymbolFactory::kSymbolVersion</code></b> ao mudar
+    qualquer geometria. Cada bloco carrega esse número como XData; ao carregar, <code>ensure()</code>
+    compara o carimbo e redefine automaticamente os blocos de builds antigas. Esquecer disso é a
+    causa nº 1 de "mudei e não apareceu" — veja <a href="elementos.html#simbolos">SymbolFactory</a>.</p>
+
+    <h3>Os componentes caíram todos na camada 0</h3>
+    <p><b>Causa:</b> <code>setLayer()</code> é um no-op silencioso quando a camada-alvo ainda não
+    existe, deixando a entidade na "0".</p>
+    <p><b>Solução:</b> as funções de inserção chamam <code>ensurePluginLayer()</code> <b>antes</b>
+    de <code>setLayer()</code>. Se você adicionou um novo tipo/camada, registre a cor dele na
+    tabela <code>kColors</code> em <code>CommandUtil.cpp</code> (senão cai no branco padrão).</p>
+
+    <h2 id="fluxo">Cálculo, circuitos e fiação</h2>
+
+    <h3>"No rooms defined" / o comando não faz nada</h3>
+    <p><b>Causa:</b> <kbd>EL-CALC-LIGHT</kbd>, <kbd>EL-OUTLET-AUTO</kbd> e
+    <kbd>EL-SWITCH-AUTO</kbd> iteram sobre os ambientes; sem nenhum, não há o que processar.</p>
+    <p><b>Solução:</b> rode <kbd>EL-ROOM</kbd> primeiro. Veja a ordem no
+    <a href="primeiro-projeto.html">guia do primeiro projeto</a>.</p>
+
+    <h3>EL-WIRE não desenha balões (<code>0 wiring tag(s)</code>)</h3>
+    <p><b>Causa:</b> é um problema de <b>dados</b>, não de desenho: um eletroduto sem circuito
+    associado não carrega condutores e, portanto, não recebe balão.</p>
+    <p><b>Solução:</b> rode <kbd>EL-CIRCUIT-AUTO</kbd> <b>antes</b> de <kbd>EL-CONDUIT-AUTO</kbd> e
+    <kbd>EL-WIRE-AUTO</kbd>. A linha impressa por EL-WIRE é o diagnóstico: <code>0 circuit(s)</code>
+    confirma que faltam circuitos. Ver <a href="el-wire.html#condutores">contagem de condutores</a>.</p>
+
+    <h3>As descidas de eletroduto viraram um ponto só</h3>
+    <p><b>Causa:</b> uma descida vertical (teto → dispositivo) difere apenas em Z; desenhada em 2D,
+    colapsa num ponto.</p>
+    <p><b>Solução:</b> os eletrodutos são desenhados como polilinhas <b>3D</b>
+    (<code>drawPolyline3D</code>) e a referência de teto (<code>ceilingZ</code>) precisa ser
+    positiva — vem do ambiente mais alto ou do padrão de 2,8 m. Confira o pé-direito dos ambientes.</p>
+
+    <h3>Um balão de fiação está sobre outra geometria</h3>
+    <p><b>Solução:</b> <kbd>EL-WIRE-FLIP</kbd> espelha o balão daquele eletroduto para o outro lado
+    do trecho (<a href="el-wire.html#flip">EL-WIRE-FLIP</a>).</p>
+
+    <h3>O número do circuito no símbolo não bate com o circuito real</h3>
+    <p><b>Causa:</b> o símbolo mostra o que foi digitado na inserção (ou "?") até a distribuição
+    rodar.</p>
+    <p><b>Solução:</b> <kbd>EL-CIRCUIT-AUTO</kbd> reescreve o atributo <code>CIRCUITO</code> de cada
+    símbolo (via <code>syncElementAttributes</code>). Rode-o depois de inserir/editar elementos.</p>
+
+    <h2 id="sync">Modelo × desenho</h2>
+
+    <h3>Apaguei uma entidade com o ERASE do CAD e o relatório ainda a conta</h3>
+    <p><b>Causa:</b> o ERASE nativo remove a entidade do desenho, mas não do
+    <code>ProjectData</code> — eles se sincronizam por handle.</p>
+    <p><b>Solução:</b> use <kbd>EL-DEL</kbd> para remover componentes/eletrodutos: ele apaga a
+    entidade <b>e</b> o registro do modelo (e o balão de fiação junto). Para o contorno de um
+    ambiente, <kbd>EL-DEL-ROOM</kbd>. Ver <a href="relatorios.html#el-del">Relatórios &amp; remoção</a>.</p>
+
+    <h3>Quero desfazer a última ação do plugin</h3>
+    <p><b>Solução:</b> <kbd>EL-UNDO</kbd> reverte o último <code>UndoGroup</code> e <b>recarrega</b>
+    o modelo a partir do .dwg restaurado, mantendo modelo e desenho juntos.</p>
+
+    <footer>open-electrical · Problemas comuns</footer>
+  </main>
+</div>
+</body>
+</html>

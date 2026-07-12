@@ -1,6 +1,9 @@
 #include "services/CircuitDistributor.h"
 #include "models/Outlet.h"
+#include "models/Panel.h"
 
+#include <algorithm>
+#include <cmath>
 #include <string>
 
 namespace electrical {
@@ -52,12 +55,21 @@ DistributionResult CircuitDistributor::distribute(ProjectData& project,
                                                   const DistributionOptions& opt) {
     DistributionResult result;
 
-    // Resolve owning panel.
+    // Resolve owning panel: the option override, else the main board (isMain),
+    // else the first panel, else the implicit main (0). We reference the panel by
+    // its OWN id (Panel::id), which is what Circuit::panelId points at - the old
+    // code read the panel element's circuitId (always -1 for a panel), so every
+    // circuit ended up on a phantom panel 0 and no panel's circuit list filled.
     int panelId = opt.targetPanelId;
     if (panelId < 0) {
-        for (const auto& e : project.elements)
-            if (e->type == ElementType::Panel) { panelId = e->circuitId >= 0 ? e->circuitId : 0; break; }
-        if (panelId < 0) panelId = 0;   // implicit main
+        const Panel* first = nullptr;
+        for (const auto& e : project.elements) {
+            if (e->type != ElementType::Panel) continue;
+            const auto* p = static_cast<const Panel*>(e.get());
+            if (!first) first = p;
+            if (p->isMain) { first = p; break; }
+        }
+        panelId = (first && first->id >= 0) ? first->id : 0;
     }
 
     const int liveConductors =
@@ -123,7 +135,64 @@ DistributionResult CircuitDistributor::distribute(ProjectData& project,
         ++result.elementsAssigned;
     }
 
+    // Rebuild every panel's circuit list from the circuits' panelId, so the
+    // panel's CIRCUITOS block attribute and the single-line diagram stay in sync.
+    // Circuits whose panelId matches no panel are attributed to the main/first
+    // panel (covers legacy data and the implicit-main id 0). Idempotent.
+    Panel* mainPanel = nullptr;
+    for (auto& e : project.elements) {
+        if (e->type != ElementType::Panel) continue;
+        auto* p = static_cast<Panel*>(e.get());
+        p->circuitIds.clear();
+        if (!mainPanel || p->isMain) mainPanel = p;
+    }
+    for (auto& e : project.elements) {
+        if (e->type != ElementType::Panel) continue;
+        auto* p = static_cast<Panel*>(e.get());
+        for (const auto& c : project.circuits) {
+            const bool owned = (c.panelId == p->id);
+            const bool orphan = (p == mainPanel) &&
+                std::none_of(project.elements.begin(), project.elements.end(),
+                    [&](const std::unique_ptr<ElectricalElement>& x) {
+                        return x->type == ElementType::Panel &&
+                               static_cast<const Panel*>(x.get())->id == c.panelId;
+                    });
+            if (owned || orphan) p->circuitIds.push_back(c.id);
+        }
+    }
+
     return result;
+}
+
+void CircuitDistributor::computeVoltageDrops(ProjectData& project) {
+    // Simplified NBR 5410 voltage-drop estimate per circuit:
+    //   dV = k * rho * L * I / S      dV% = 100 * dV / Vref
+    // rho = copper resistivity (~0.0172 ohm.mm2/m at 20 C); L = one-way conductor
+    // length (m) = the summed length of the conduits carrying this circuit; I =
+    // connected load current; S = phase conductor section (mm2). k accounts for the
+    // return path: 2 for single/two-phase (phase+return), sqrt(3) for three-phase.
+    // Deliberately ignores power factor, temperature and bunching derating - it is
+    // a first-pass indicator, refine against the full NBR 5410 tables if required.
+    constexpr double rho = 0.0172;   // ohm.mm2/m, copper
+    const auto& s = project.settings;
+    const bool threePhase = (s.phases == Phases::ThreePhase);
+    const double vRef = threePhase
+        ? (s.voltageLineToLine > 0 ? s.voltageLineToLine : 380.0)
+        : (s.voltageLineToNeutral > 0 ? s.voltageLineToNeutral : 220.0);
+    const double k = threePhase ? std::sqrt(3.0) : 2.0;
+
+    for (auto& c : project.circuits) {
+        double lengthM = 0.0;
+        for (const auto& cond : project.conduits)
+            if (std::find(cond.circuitIds.begin(), cond.circuitIds.end(), c.id)
+                    != cond.circuitIds.end())
+                lengthM += cond.lengthM;
+
+        const double section = c.phaseConductorMM2 > 0 ? c.phaseConductorMM2 : 1.5;
+        const double current = (vRef > 0) ? (c.connectedLoadVA / vRef) : 0.0;
+        const double dV = k * rho * lengthM * current / section;
+        c.voltageDropPct = (vRef > 0) ? (100.0 * dV / vRef) : 0.0;
+    }
 }
 
 } // namespace electrical

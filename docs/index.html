@@ -3,31 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Documentação do open-electrical: plugin BRX/C++ para BricsCAD V26 de projeto de instalações elétricas residenciais (NBR 5410 / NBR 5444).">
 <title>open-electrical · Documentação</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
 <link rel="stylesheet" href="style.css">
+<script src="nav.js" defer></script>
 </head>
 <body>
 <div class="layout">
-  <aside>
-    <a href="index.html"><img class="brand-logo" src="assets/open-electrical.svg" alt="open-electrical"></a>
-    <div class="tag">Plugin elétrico para BricsCAD · BRX / C++</div>
-    <nav>
-      <a href="index.html" class="active">Início</a>
-      <div class="group">Fundamentos</div>
-      <a href="fundamentos.html#requisitos">Requisitos</a>
-      <a href="fundamentos.html#estrutura">Estrutura do projeto</a>
-      <a href="fundamentos.html#tecnologias">Tecnologias</a>
-      <a href="fundamentos.html#logica">Lógica geral</a>
-      <div class="group">Comandos</div>
-      <a href="elementos.html">Elementos &amp; símbolos</a>
-      <a href="calculo.html">Cálculo &amp; circuitos</a>
-      <a href="roteamento.html">Eletrodutos &amp; roteamento</a>
-      <a href="el-wire.html">Fiação (EL-WIRE)</a>
-      <a href="relatorios.html">Relatórios &amp; remoção</a>
-      <div class="group">Interface</div>
-      <a href="interface.html">Paleta, config &amp; i18n</a>
-    </nav>
-  </aside>
+  <aside data-nav></aside>
 
   <main>
     <img class="hero-logo" src="assets/open-electrical.svg" alt="open-electrical">
@@ -35,31 +19,27 @@
     <p class="lead">Plugin nativo (BRX / C++) para o BricsCAD V26 que auxilia no projeto de
     instalações elétricas residenciais conforme a NBR 5410 / NBR 5444.</p>
 
-    <p>Este site é o ponto de partida da documentação. Comece pelos <b>Fundamentos</b> para
-    entender o ambiente, a estrutura e a lógica geral, e depois vá para o mergulho profundo
-    no comando de <b>distribuição de fiação</b> — que é onde os "balões" de condutores
-    (aro + haste + trilho + símbolos de Fase, Neutro, Terra e Retorno) são desenhados.</p>
+    <p>Este site é o ponto de partida da documentação. Se é a sua primeira vez, siga o
+    <a href="primeiro-projeto.html"><b>guia do primeiro projeto</b></a> — um passo-a-passo do
+    ambiente vazio até os relatórios. Depois, os <b>Fundamentos</b> explicam o ambiente, a
+    estrutura e a lógica geral, e a página de <b>fiação</b> mergulha no comando que desenha os
+    "balões" de condutores (aro + haste + trilho + símbolos de Fase, Neutro, Terra e Retorno).</p>
 
     <div class="card-grid">
-      <a class="card" href="fundamentos.html#requisitos">
-        <h3>Requisitos</h3>
-        <p>SDK, BricsCAD, wxWidgets, toolchain e como compilar/instalar.</p>
+      <a class="card" href="primeiro-projeto.html">
+        <h3>Guia: primeiro projeto ▸</h3>
+        <p>Do desenho vazio ao quadro de cargas: a sequência completa de comandos, com o que
+        esperar em cada passo.</p>
       </a>
-      <a class="card" href="fundamentos.html#estrutura">
-        <h3>Estrutura do projeto</h3>
-        <p>Pastas <code>src/</code>, camadas <code>commands/models/services</code> e recursos.</p>
-      </a>
-      <a class="card" href="fundamentos.html#tecnologias">
-        <h3>Tecnologias</h3>
-        <p>C++17, BRX (ObjectARX-compatível), Teigha/ODA, wxWidgets, CMake+Ninja.</p>
-      </a>
-      <a class="card" href="fundamentos.html#logica">
-        <h3>Lógica geral</h3>
-        <p>Como comandos, o modelo <code>ProjectData</code> e a persistência se encaixam.</p>
+      <a class="card" href="fundamentos.html">
+        <h3>Fundamentos ▸</h3>
+        <p>Requisitos, estrutura do projeto, stack (C++17/BRX/wxWidgets), lógica geral e como
+        escrever testes.</p>
       </a>
       <a class="card" href="elementos.html">
         <h3>Elementos &amp; símbolos ▸</h3>
-        <p>EL-ROOM, EL-LIGHT, EL-OUTLET, EL-SWITCH, EL-PANEL, EL-EDIT e a SymbolFactory (NBR 5444).</p>
+        <p>EL-ROOM, EL-LIGHT, EL-OUTLET, EL-SWITCH, EL-PANEL, EL-EDIT, a SymbolFactory e a
+        galeria visual NBR 5444.</p>
       </a>
       <a class="card" href="calculo.html">
         <h3>Cálculo &amp; circuitos ▸</h3>
@@ -81,18 +61,35 @@
         <h3>Interface, config &amp; i18n ▸</h3>
         <p>A paleta (EL), EL-CONFIG, tradução em runtime e onde customizar cada interface.</p>
       </a>
+      <a class="card" href="troubleshooting.html">
+        <h3>Problemas comuns ▸</h3>
+        <p>Sintoma → causa → solução: cache do .lrx, símbolos desatualizados, balões ausentes,
+        crash do wxWidgets e mais.</p>
+      </a>
     </div>
 
     <div class="note">
       <b>Status desta documentação.</b> Todas as seções estão escritas: fundamentos e os
-      <b>26 comandos</b>, agrupados em Elementos &amp; símbolos, Cálculo &amp; circuitos,
-      Eletrodutos &amp; roteamento, Fiação (EL-WIRE), Relatórios &amp; remoção e Interface.
-      Cada página termina com uma tabela <i>"como customizar"</i> apontando o arquivo/função a
-      editar. Uma referência rápida de todos os comandos está no fim da página de
+      <b>26 comandos</b> registrados, agrupados em Elementos &amp; símbolos, Cálculo &amp;
+      circuitos, Eletrodutos &amp; roteamento, Fiação (EL-WIRE), Relatórios &amp; remoção e
+      Interface. Cada página termina com uma tabela <i>"como customizar"</i> apontando o
+      arquivo/função a editar. A referência rápida de todos os comandos está no fim da página de
       <a href="interface.html#tabela">Interface</a>.
     </div>
 
-    <footer>open-electrical · gerado como site estático (HTML/CSS puro, sem build). Abra
+    <h2 id="legado">Notas técnicas complementares</h2>
+    <p>Fora deste site, o repositório mantém dois documentos de referência mais profundos em
+    <code>docs-legacy/</code> (Markdown, em inglês):</p>
+    <ul>
+      <li><a href="../docs-legacy/ARCHITECTURE.md"><code>ARCHITECTURE.md</code></a> — camadas,
+      fluxo de dados, ciclo de vida do módulo, persistência e costuras de UI.</li>
+      <li><a href="../docs-legacy/BRICSCAD-BRX-LINUX.md"><code>BRICSCAD-BRX-LINUX.md</code></a> —
+      notas de campo do BRX no Linux: SDK × runtime, o módulo <code>.lrx</code>, o conflito de
+      versões do wxWidgets (e sua correção), e como depurar com o BricsCAD dentro de sandbox
+      <code>bwrap</code>. Leia antes de qualquer trabalho BRX/GUI no Linux.</li>
+    </ul>
+
+    <footer>open-electrical · gerado como site estático (HTML/CSS/JS puro, sem build). Abra
     <code>docs/index.html</code> no navegador.</footer>
   </main>
 </div>

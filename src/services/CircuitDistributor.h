@@ -40,6 +40,12 @@ public:
 
     // A conventional breaker rating (A) for a conductor section, surface/PVC.
     static double breakerFor(double conductorMM2);
+
+    // Fills Circuit::voltageDropPct for every circuit from the routed conduit
+    // lengths and the connected load, per a simplified NBR 5410 model (copper,
+    // resistive load). Call AFTER routing (EL-CONDUIT-AUTO), when conduit lengths
+    // are known - EL-WIRE-AUTO does this. Circuits with no routed conduit keep 0.
+    static void computeVoltageDrops(ProjectData& project);
 };
 
 } // namespace electrical

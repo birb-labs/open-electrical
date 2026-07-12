@@ -5,6 +5,7 @@ namespace electrical {
 void Panel::serialize(PropertyBag& bag) const {
     serializeBase(bag);
     bag.putText("type", typeTag());
+    bag.putInt("id", id);
     bag.putText("name", name);
     bag.putInt("isMain", isMain ? 1 : 0);
     bag.putInt("embedded", embedded ? 1 : 0);
@@ -17,6 +18,7 @@ void Panel::serialize(PropertyBag& bag) const {
 
 void Panel::deserialize(const PropertyBag& bag) {
     deserializeBase(bag);
+    id            = static_cast<int>(bag.getInt("id", -1));
     name          = bag.getText("name", "QD-1");
     isMain        = bag.getInt("isMain", 0) != 0;
     embedded      = bag.getInt("embedded", 0) != 0;

@@ -83,7 +83,7 @@ void appendRoundedTriangle(std::vector<Segment>& out, double yBase, bool roundAp
 
 } // namespace
 
-std::vector<Segment> segments(Kind kind, int modules) {
+std::vector<Segment> segments(Kind kind, int modules, bool flushPanel) {
     std::vector<Segment> segs;
     switch (kind) {
         case Kind::Light:
@@ -98,10 +98,14 @@ std::vector<Segment> segments(Kind kind, int modules) {
         case Kind::Panel: {
             const double w = 6.0 * kSwR, h = 2.0 * kSwR;   // 3:1 rectangle
             const double x = w / 2.0;
-            appendSeg(segs, -x, 0.0,  x, 0.0);
-            appendSeg(segs,  x, 0.0,  x, h);
-            appendSeg(segs,  x, h,   -x, h);
-            appendSeg(segs, -x, h,   -x, 0.0);
+            // Flush (embutido) panels are recessed ~75% of their height past the
+            // wall line, exactly like SymbolFactory::buildPanel's yOff.
+            const double y0 = flushPanel ? -0.75 * h : 0.0;
+            const double y1 = y0 + h;
+            appendSeg(segs, -x, y0,  x, y0);
+            appendSeg(segs,  x, y0,  x, y1);
+            appendSeg(segs,  x, y1, -x, y1);
+            appendSeg(segs, -x, y1, -x, y0);
             break;
         }
         case Kind::Outlet: {
@@ -153,8 +157,8 @@ Point3 toLocal(const Point3& world, const Point3& origin, double rot) {
 }
 
 Point3 nearestAttachPoint(Kind kind, int modules, const Point3& origin, double rot,
-                          const Point3& target) {
-    const std::vector<Segment> segs = segments(kind, modules);
+                          const Point3& target, bool flushPanel) {
+    const std::vector<Segment> segs = segments(kind, modules, flushPanel);
     const Point3 tLocal = toLocal(target, origin, rot);
     const Point3 pLocal = closestOnSegments(segs, tLocal);
     return toWorld(pLocal, origin, rot);

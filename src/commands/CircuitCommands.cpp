@@ -41,10 +41,16 @@ std::string handleOfId(AcDbObjectId id) {
 
 // Classifies a placed symbol by its block name into the outline kind + outlet
 // module count used by the connection rule. Returns false for non-plugin blocks.
-bool classifyOutline(const std::wstring& blockName, outline::Kind& kind, int& modules) {
+bool classifyOutline(const std::wstring& blockName, outline::Kind& kind, int& modules,
+                     bool& flushPanel) {
     modules = 1;
+    flushPanel = false;
     if (blockName.rfind(L"EL_LIGHT", 0) == 0)  { kind = outline::Kind::Light;  return true; }
-    if (blockName.rfind(L"EL_PANEL", 0) == 0)  { kind = outline::Kind::Panel;  return true; }
+    if (blockName.rfind(L"EL_PANEL", 0) == 0)  {
+        kind = outline::Kind::Panel;
+        flushPanel = (blockName == L"EL_PANEL_FLUSH");
+        return true;
+    }
     if (blockName.rfind(L"EL_SWITCH", 0) == 0) { kind = outline::Kind::Switch; return true; }
     if (blockName.rfind(L"EL_OUTLET", 0) == 0) {
         kind = outline::Kind::Outlet;
@@ -70,13 +76,15 @@ struct AttachSpec {
     Point3       pos;
     double       rot = 0.0;
     bool         known = false;
+    bool         flushPanel = false;
 };
 
 bool resolveAttach(AcDbObjectId id, AttachSpec& out) {
     if (!blockRefTransform(id, out.pos, out.rot)) return false;
     out.handle = handleOfId(id);
     std::wstring bn;
-    if (blockRefName(id, bn)) out.known = classifyOutline(bn, out.kind, out.modules);
+    if (blockRefName(id, bn))
+        out.known = classifyOutline(bn, out.kind, out.modules, out.flushPanel);
     return true;
 }
 
@@ -84,7 +92,8 @@ bool resolveAttach(AcDbObjectId id, AttachSpec& out) {
 // insertion point when the block kind is unknown).
 Point3 attachPoint(const AttachSpec& a, const Point3& target) {
     if (!a.known) return Point3(a.pos.x, a.pos.y, 0.0);
-    Point3 p = outline::nearestAttachPoint(a.kind, a.modules, a.pos, a.rot, target);
+    Point3 p = outline::nearestAttachPoint(a.kind, a.modules, a.pos, a.rot, target,
+                                           a.flushPanel);
     p.z = 0.0;
     return p;
 }

@@ -1,11 +1,13 @@
 #include "services/Router.h"
 #include "models/Circuit.h"
 #include "models/Switch.h"
+#include "services/CircuitDistributor.h"
 #include "services/WireCounts.h"
 #include "utilities/GeometryHelper.h"
 #include "utilities/PolyMath.h"
 
 #include <algorithm>
+#include <vector>
 
 namespace electrical {
 
@@ -64,6 +66,11 @@ RoutingResult Router::route(ProjectData& project, const RoutingOptions& opt) {
     // Circuit currently being routed; stamped onto every conduit created below so
     // the wiring balloon knows which circuit(s) travel through each run.
     int curCircuitId = -1;
+
+    // Circuits that actually got routed - the single shared panel drop (added once,
+    // after the loop) is tagged with all of them, so the trunk at the panel carries
+    // the sum of their conductors without stacking duplicate coincident drops.
+    std::vector<int> routedCircuits;
 
     // Emits one vertical drop conduit (ceiling -> device at its mounting height).
     auto addDrop = [&](const ElectricalElement* d) {
@@ -140,6 +147,7 @@ RoutingResult Router::route(ProjectData& project, const RoutingOptions& opt) {
         }
         if (lights.empty() && switches.empty() && outlets.empty() && others.empty())
             continue;
+        routedCircuits.push_back(circuit.id);
 
         // The run leaves the panel (or, lacking one, the first available device).
         const ElectricalElement* originElem = panel;
@@ -158,8 +166,7 @@ RoutingResult Router::route(ProjectData& project, const RoutingOptions& opt) {
             for (auto* d : switches) addDrop(d);
             for (auto* d : outlets)  addDrop(d);
             for (auto* d : others)   addDrop(d);
-            if (panel) addDrop(panel);
-            continue;
+            continue;   // the shared panel drop is added once, after the loop
         }
 
         // ---- Lighting: panel -> light1 -> light2 -> ... (nearest walk) --------
@@ -209,11 +216,30 @@ RoutingResult Router::route(ProjectData& project, const RoutingOptions& opt) {
         for (auto* d : others) addCeilingRun(origin, originR, d->position, elementRadius(d));
 
         // ---- Vertical drops (ceiling -> each device at its mounting height) ----
-        if (panel) addDrop(panel);
+        // The panel drop is NOT added here (it would stack one coincident drop per
+        // circuit, inflating the BOM); it is emitted once below.
         for (auto* d : orderedLights)  addDrop(d);
         for (auto* d : switches)       addDrop(d);
         for (auto* d : orderedOutlets) addDrop(d);
         for (auto* d : others)         addDrop(d);
+    }
+
+    // One shared vertical drop at the panel (ceiling -> panel), tagged with every
+    // circuit routed, instead of a duplicate per circuit.
+    if (panel && !routedCircuits.empty()) {
+        Conduit c;
+        c.id = project.allocConduitId();
+        c.material = opt.material;
+        c.diameterMM = opt.diameterMM;
+        c.circuitIds = routedCircuits;
+        c.isVerticalDrop = true;
+        c.path = { Point3(panel->position.x, panel->position.y, ceilingZ),
+                   Point3(panel->position.x, panel->position.y,
+                          panel->mountingHeight * invUnit) };
+        c.recomputeLength(project.settings.unit);
+        result.totalLengthM += c.lengthM;
+        project.conduits.push_back(std::move(c));
+        ++result.conduitsCreated;
     }
 
     return result;
@@ -275,6 +301,10 @@ void Router::pullWires(ProjectData& project) {
             for (int i = 0; i < cs.retorno; ++i) conduit.wires.push_back({ cid, phaseG, "return",  conduit.lengthM });
         }
     }
+
+    // Conduit lengths are known now, so fill in each circuit's voltage drop
+    // (simplified NBR 5410) for the load schedule / single-line diagram.
+    CircuitDistributor::computeVoltageDrops(project);
 }
 
 } // namespace electrical

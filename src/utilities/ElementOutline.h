@@ -27,8 +27,10 @@ enum class Kind { Light, Outlet, Switch, Panel };
 using Segment = std::pair<Point3, Point3>;
 
 // The outline segments for `kind`. `modules` is the outlet module count (1..3),
-// ignored for the other kinds.
-std::vector<Segment> segments(Kind kind, int modules);
+// ignored for the other kinds. `flushPanel` shifts a Panel outline down by the
+// same recess the flush (embutido) block uses, so its attach points match the
+// drawn geometry; ignored for the other kinds.
+std::vector<Segment> segments(Kind kind, int modules, bool flushPanel = false);
 
 // Closest point on a set of segments to `target` (all in the same frame). Returns
 // `target` itself when `segs` is empty.
@@ -42,7 +44,7 @@ Point3 toLocal(const Point3& world, const Point3& origin, double rot);
 // Convenience: the world-space point on `kind`'s outline (placed at origin/rot)
 // nearest to world-space `target`.
 Point3 nearestAttachPoint(Kind kind, int modules, const Point3& origin, double rot,
-                          const Point3& target);
+                          const Point3& target, bool flushPanel = false);
 
 } // namespace outline
 } // namespace electrical

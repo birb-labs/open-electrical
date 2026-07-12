@@ -163,7 +163,18 @@ enable_testing()
 add_executable(oe_tests EXCLUDE_FROM_ALL
     "${CMAKE_CURRENT_SOURCE_DIR}/tests/tests.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/models/Room.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/models/ProjectData.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/models/ProjectSettings.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/models/ElectricalElement.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/models/LightPoint.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/models/Outlet.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/models/Switch.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/models/Panel.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/models/Circuit.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/models/Conduit.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/services/LightingCalculator.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/services/CircuitDistributor.cpp"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/services/ReportGenerator.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/utilities/PolyMath.cpp"
     "${CMAKE_CURRENT_SOURCE_DIR}/src/utilities/ElementOutline.cpp")
 target_include_directories(oe_tests PRIVATE

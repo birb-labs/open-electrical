@@ -10,6 +10,7 @@ namespace electrical {
 
 class Panel final : public ElectricalElement {
 public:
+    int         id = -1;             // unique panel id (Circuit::panelId references this)
     std::string name = "QD-1";       // panel designation
     bool        isMain = false;      // main board (QGBT) vs sub-board
     bool        embedded = false;    // embutido (flush in the wall) vs aparente (surface)

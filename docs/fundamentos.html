@@ -3,35 +3,24 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Fundamentos do open-electrical: requisitos de build, estrutura do projeto, stack tecnológica, lógica geral e testes de unidade.">
 <title>Fundamentos · open-electrical</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
 <link rel="stylesheet" href="style.css">
+<script src="nav.js" defer></script>
 </head>
 <body>
 <div class="layout">
-  <aside>
-    <a href="index.html"><img class="brand-logo" src="assets/open-electrical.svg" alt="open-electrical"></a>
-    <div class="tag">Plugin elétrico para BricsCAD · BRX / C++</div>
-    <nav>
-      <a href="index.html">Início</a>
-      <div class="group">Fundamentos</div>
-      <a href="#requisitos" class="active">Requisitos</a>
-      <a href="#estrutura">Estrutura do projeto</a>
-      <a href="#tecnologias">Tecnologias</a>
-      <a href="#logica">Lógica geral</a>
-      <div class="group">Comandos</div>
-      <a href="elementos.html">Elementos &amp; símbolos</a>
-      <a href="calculo.html">Cálculo &amp; circuitos</a>
-      <a href="roteamento.html">Eletrodutos &amp; roteamento</a>
-      <a href="el-wire.html">Fiação (EL-WIRE)</a>
-      <a href="relatorios.html">Relatórios &amp; remoção</a>
-      <div class="group">Interface</div>
-      <a href="interface.html">Paleta, config &amp; i18n</a>
-    </nav>
-  </aside>
+  <aside data-nav></aside>
 
   <main>
     <h1>Fundamentos</h1>
-    <p class="lead">Ambiente, estrutura, stack e a lógica geral de funcionamento do plugin.</p>
+    <p class="lead">Ambiente, estrutura, stack, a lógica geral de funcionamento do plugin e como
+    escrever testes.</p>
+
+    <div class="note">Os trechos de código desta documentação são <b>simplificações</b> do fonte
+    real (linhas de log, tratamento de erro e casts podem ter sido omitidos). O caminho acima de
+    cada trecho aponta o arquivo/função canônicos.</div>
 
     <!-- ===================== REQUISITOS ===================== -->
     <h2 id="requisitos">Requisitos</h2>
@@ -54,6 +43,8 @@
       wxWidgets (3.1). Linkar o módulo contra um wxWidgets <i>compartilhado</i> do sistema
       coloca dois runtimes wx no mesmo processo e <b>derruba o host</b> ao carregar. Por isso
       o CMake linka um wxWidgets <b>privado e estático</b> (prefixo <code>wxstatic-oel-*</code>).
+      A história completa dessa investigação está em
+      <a href="../docs-legacy/BRICSCAD-BRX-LINUX.md"><code>docs-legacy/BRICSCAD-BRX-LINUX.md</code></a>.
     </div>
 
     <h3>Compilar e instalar</h3>
@@ -70,7 +61,8 @@
 (arxload "/home/&lt;user&gt;/.local/share/open-electrical/open-electrical.lrx")</code></pre>
     <div class="warn"><b>Cache de carga (.lrx).</b> O BricsCAD faz cache do módulo em nível de
     processo. Depois de recompilar, <b>feche e reabra o BricsCAD</b> — um simples re-APPLOAD
-    pode continuar executando o binário antigo.</div>
+    pode continuar executando o binário antigo. Mais casos como este em
+    <a href="troubleshooting.html">Problemas comuns</a>.</div>
 
     <!-- ===================== ESTRUTURA ===================== -->
     <h2 id="estrutura">Estrutura do projeto</h2>
@@ -78,6 +70,7 @@
 ├── CMakeLists.txt          # build; alvo MODULE → open-electrical.lrx + alvo de testes
 ├── scripts/setup.sh        # configura + compila + instala
 ├── cmake/                  # find_package(BRX), etc.
+├── docs/                   # este site; docs-legacy/ guarda as notas técnicas em Markdown
 ├── resources/
 │   ├── lang/               # pt-BR.json, en.json, es.json (i18n)
 │   ├── symbols/            # blocos de símbolos
@@ -120,11 +113,11 @@
     <h3>1. Registro de comandos</h3>
     <p>Todos os comandos ficam numa tabela única e são registrados automaticamente.</p>
     <span class="filepath">src/commands/Commands.cpp</span>
-<pre><code>{ _T("EL-CIRCUIT-AUTO"),_T("EL-CIRCUIT-AUTO"),&distributeCircuitsAuto, ACRX_CMD_MODAL },
-{ _T("EL-CONDUIT-AUTO"),_T("EL-CONDUIT-AUTO"),&routeConduitAuto,       ACRX_CMD_MODAL },
-{ _T("EL-WIRE"),        _T("EL-WIRE"),        &routeWire,              ACRX_CMD_MODAL },
-{ _T("EL-WIRE-AUTO"),   _T("EL-WIRE-AUTO"),   &routeWireAuto,          ACRX_CMD_MODAL },
-{ _T("EL-WIRE-FLIP"),   _T("EL-WIRE-FLIP"),   &flipWiring,  ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET },
+<pre><code>{ _T("EL-CIRCUIT-AUTO"),_T("EL-CIRCUIT-AUTO"),&amp;distributeCircuitsAuto, ACRX_CMD_MODAL },
+{ _T("EL-CONDUIT-AUTO"),_T("EL-CONDUIT-AUTO"),&amp;routeConduitAuto,       ACRX_CMD_MODAL },
+{ _T("EL-WIRE"),        _T("EL-WIRE"),        &amp;routeWire,              ACRX_CMD_MODAL },
+{ _T("EL-WIRE-AUTO"),   _T("EL-WIRE-AUTO"),   &amp;routeWireAuto,          ACRX_CMD_MODAL },
+{ _T("EL-WIRE-FLIP"),   _T("EL-WIRE-FLIP"),   &amp;flipWiring,  ACRX_CMD_MODAL | ACRX_CMD_USEPICKSET },
 // ... (adicionar um comando = 1 linha aqui + 1 declaração em Commands.h)</code></pre>
 
     <h3>2. O modelo <code>ProjectData</code></h3>
@@ -157,9 +150,42 @@
       <li><code>ProjectContext::instance().save()</code> e imprime um resumo.</li>
     </ol>
 
+    <!-- ===================== TESTES ===================== -->
+    <h2 id="testes">Testes de unidade</h2>
+    <p>O núcleo livre de BRX (<code>models/</code>, <code>services/</code> puros e
+    <code>utilities/</code>) é coberto por <b>37 testes</b> num framework próprio de um único
+    header — escolhido porque o build precisa funcionar totalmente offline, sem vendorizar
+    GoogleTest/Catch2.</p>
+    <span class="filepath">tests/test_framework.h</span>
+<pre><code>TEST_CASE(nome_do_teste) { ... }   // auto-registrado no runner
+CHECK(cond);                       // falha não-fatal, segue o teste
+CHECK_EQ(a, b);
+CHECK_NEAR(a, b, eps);             // comparação de ponto flutuante</code></pre>
+
+    <h3>Como adicionar um teste</h3>
+    <ol>
+      <li>Abra <code>tests/tests.cpp</code> e adicione um <code>TEST_CASE(meu_teste) { ... }</code>
+      — o <code>Registrar</code> estático o inclui no runner automaticamente, sem lista manual.</li>
+      <li>Use apenas código do núcleo (nada de <code>AcDb*</code>/<code>aced*</code>): os testes
+      linkam <b>sem</b> o BRX SDK. Se a lógica que você quer testar vive num comando, extraia-a
+      para um <i>service</i>/<i>utility</i> primeiro — é essa a razão de módulos como
+      <code>ElementOutline</code> e <code>WireCounts</code> serem BRX-free.</li>
+      <li>Rode: <code>cmake --build build --target check</code>. O runner imprime
+      <code>N/37 tests passed</code> e retorna não-zero em falha (usável em CI).</li>
+    </ol>
+    <p>Cobertura atual (amostra dos casos): área/perímetro de polígonos (<code>PolyMath</code>),
+    ponto-em-polígono e distribuição de luminárias em plantas em L, método dos lúmens
+    (contagens conhecidas de luminárias), serialização/round-trip de <code>Room</code>,
+    trimming de eletrodutos, contornos do <code>ElementOutline</code> (com rotação, módulos
+    empilhados e recuo do quadro embutido) e contagem de condutores (<code>WireCounts</code>).
+    Também há regressões para o vínculo quadro↔circuito: <code>CircuitDistributor</code> preenchendo
+    <code>Panel::circuitIds</code>, o unifilar listando cada circuito uma única vez sob o seu quadro,
+    e a queda de tensão (<code>computeVoltageDrops</code>).</p>
+
     <div class="note">Pronto para o mergulho profundo? Vá para
     <a href="el-wire.html">EL-WIRE / EL-WIRE-AUTO</a> — o comando que calcula os condutores por
-    circuito e desenha os balões dentro dos eletrodutos.</div>
+    circuito e desenha os balões dentro dos eletrodutos. Ou comece do zero com o
+    <a href="primeiro-projeto.html">guia do primeiro projeto</a>.</div>
 
     <footer>open-electrical · Fundamentos</footer>
   </main>

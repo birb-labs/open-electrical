@@ -14,7 +14,7 @@ scope to PRO-Elétrica), following **ABNT NBR 5410** (installations) and
 - **Persistence:** all project data is stored inside the `.dwg` using named
   dictionaries + Xrecords (and XData stamps on the placed blocks).
 
-> **Status: foundation build.** All 18 commands are registered and functional,
+> **Status: foundation build.** All **26 commands** are registered and functional,
 > the data model + drawing persistence are complete, `EL-CONFIG` is wired
 > end-to-end through the wxWidgets dialog, and the calculation/report services
 > are implemented (the lumen method is fully implemented; the circuit
@@ -24,13 +24,16 @@ scope to PRO-Elétrica), following **ABNT NBR 5410** (installations) and
 
 ## Documentation
 
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** — how the plugin is built:
-  layers, data flow, module lifecycle, persistence, UI seams.
-- **[docs/BRICSCAD-BRX-LINUX.md](docs/BRICSCAD-BRX-LINUX.md)** — field notes on
-  **BricsCAD BRX on Linux**: the SDK-vs-runtime split, the `.lrx` module, the
-  whole-archive entry point, the **wxWidgets version conflict + embedded-init
-  crash and their fixes**, and how to debug when the CAD engine runs inside a
-  `bwrap` sandbox. Read this before doing any BRX/GUI work on Linux.
+- **[docs/index.html](docs/index.html)** — the full documentation site (static
+  HTML/CSS/JS, no build; in Portuguese). Start with the **first-project guide**,
+  then the per-command pages and the **troubleshooting** page.
+- **[docs-legacy/ARCHITECTURE.md](docs-legacy/ARCHITECTURE.md)** — how the plugin
+  is built: layers, data flow, module lifecycle, persistence, UI seams.
+- **[docs-legacy/BRICSCAD-BRX-LINUX.md](docs-legacy/BRICSCAD-BRX-LINUX.md)** —
+  field notes on **BricsCAD BRX on Linux**: the SDK-vs-runtime split, the `.lrx`
+  module, the whole-archive entry point, the **wxWidgets version conflict +
+  embedded-init crash and their fixes**, and how to debug when the CAD engine
+  runs inside a `bwrap` sandbox. Read this before doing any BRX/GUI work on Linux.
 
 ---
 
@@ -193,8 +196,8 @@ names are English and prefixed `EL-`.
    0 = auto)**. Area is computed automatically. These parameters are stored on the
    room — there is no global lighting configuration.
 3. Place elements:
-   - **`EL-LIGHT`** / **`EL-LIGHT-AUTO`** — lighting points (auto uses the lumen
-     method with NBR 5413/ISO 8995 lux targets and lays them on a grid).
+   - **`EL-LIGHT`** — insert a lighting point manually (ceiling or wall). The
+     automatic, lumen-method placement is **`EL-CALC-LIGHT`** (below).
    - **`EL-OUTLET`** / **`EL-OUTLET-AUTO`** — outlets (single/duplex/triplex, each
      module with its own height; auto spaces them along the perimeter per
      NBR 5410).
@@ -233,7 +236,7 @@ names are English and prefixed `EL-`.
 | `EL` | Open/close the main palette |
 | `EL-CONFIG` | Project settings |
 | `EL-ROOM` | Insert/edit room |
-| `EL-LIGHT` / `EL-LIGHT-AUTO` | Lighting point — manual / automatic |
+| `EL-LIGHT` | Lighting point — manual insertion |
 | `EL-OUTLET` / `EL-OUTLET-AUTO` | Outlet — manual / automatic |
 | `EL-SWITCH` / `EL-SWITCH-AUTO` | Switch — manual / automatic |
 | `EL-PANEL` | Load panel |
@@ -241,16 +244,23 @@ names are English and prefixed `EL-`.
 | `EL-EDIT` | Edit a placed component (re-opens its dialog, updates the symbol) |
 | `EL-CIRCUIT` / `EL-CIRCUIT-AUTO` | Circuit distribution — manual / automatic |
 | `EL-CONDUIT` / `EL-CONDUIT-AUTO` | Conduit routing — manual / automatic |
+| `EL-CONDUIT-EDIT` | Reshape a manual conduit run (endpoint / curve) |
 | `EL-ROUTE-AUTO` | Route conduits **and** pull wires in one step |
 | `EL-WIRE` / `EL-WIRE-AUTO` | Wiring — manual / automatic |
+| `EL-WIRE-FLIP` | Mirror a conduit's wiring balloon to the other side |
 | `EL-REPORT` | Generate all reports (Legend / Loads / BOM / SLD) |
 | `EL-LOAD-SCHEDULE` | Insert only the load schedule (quadro de cargas) |
 | `EL-SINGLE-LINE` | Insert only the single-line diagram |
+| `EL-DEL` | Delete selected components/conduits (model + drawing) |
+| `EL-DEL-ROOM` | Delete only a room boundary (components kept) |
 | `EL-UNDO` | Undo the last plugin action |
+
+> All 26 registered commands are listed in `src/commands/Commands.cpp`. Note
+> there is **no** `EL-LIGHT-AUTO` command — automatic lighting is `EL-CALC-LIGHT`.
 
 ### 5.3 Lighting calculation (lumen method)
 
-`EL-CALC-LIGHT` and `EL-LIGHT-AUTO` both run:
+`EL-CALC-LIGHT` runs:
 
 ```
 phi_total = (E x A) / (CU x MF)        N = ceil(phi_total / phi_luminaire)
@@ -278,7 +288,8 @@ in any global configuration:
 - Work-plane and ceiling heights come from the room.
 
 So the workflow is: `EL-ROOM` for each room, **setting its type + contrast** →
-`EL-CALC-LIGHT` (pick room(s) + luminaire) → `EL-CIRCUIT-AUTO`.
+`EL-CALC-LIGHT` (pick room(s) + luminaire) → `EL-CIRCUIT-AUTO`. (There is no
+separate `EL-LIGHT-AUTO` command; `EL-CALC-LIGHT` is the automatic placement.)
 
 Rooms without a boundary polygon are skipped with a message; if no room has one,
 the command says so and does nothing.
@@ -297,8 +308,9 @@ the command says so and does nothing.
   which is spread-preserving but not a true optimal layout.
 - Conduit routing is nearest-neighbour from the panel with orthogonal ceiling runs
   and vertical drops — no corridor/wall-following awareness. `Router::pullWires()`
-  still tags every conduit with the first circuit's conductor set rather than
-  tracing the graph (adequate for the BOM totals, not for per-circuit fill).
+  tags each conduit with the conductor set of **every distinct circuit** travelling
+  through it (`Router::conduitCircuits`), so a shared trunk accumulates correctly;
+  what is still missing is graph-based fill/derating per segment.
 
 ### 5.5 Symbols
 
@@ -322,14 +334,16 @@ the element dialog:
 | `EL_SWITCH_3WAY` | Three-way (parallel) | As 1-section, fully solid-filled |
 | `EL_SWITCH_4WAY` | Four-way (intermediate) | As 2-section, half solid-filled |
 | `EL_SWITCH_BELL` | Bell push button | As 1-section, with a small filled centre dot |
-| `EL_PANEL_SURFACE` | Load panel, aparente (surface) | 2:1 rectangle flush against the wall + **solid-filled** right triangle (hypotenuse on the secondary diagonal) |
+| `EL_PANEL_SURFACE` | Load panel, aparente (surface) | 3:1 rectangle flush against the wall + **solid-filled** right triangle (hypotenuse on the secondary diagonal) |
 | `EL_PANEL_FLUSH` | Load panel, embutido (flush) | Same rectangle + filled triangle, ~75% recessed past the wall line |
 
 **Notations (editable block attributes).** Every symbol carries NBR 5444
 notations as **block attributes** you can double-click to edit in BricsCAD:
-`POT` (power), `LETRA` (controlling-switch letter), `CIRC` (circuit number) on
-light/outlet points; `LETRA` on switches; `NOME` / `CIRCUITOS` on panels. The
-insertion dialogs collect these up-front and they persist in the project data.
+`POTENCIA` (power), `COMANDO` (controlling-switch letter), `CIRCUITO` (circuit
+number) on light/outlet points; `COMANDO1..N` (one per section) on switches;
+`NOME` / `CIRCUITOS` on panels. The insertion dialogs collect these up-front and
+they persist in the project data. (These tags were renamed from the earlier
+`POT`/`LETRA`/`CIRC` in symbol version 6.)
 
 **Wall rotation.** Wall-mounted symbols (outlets, switches, wall lights, panels)
 prompt for a second point *toward the room interior* after the insertion point
@@ -379,7 +393,10 @@ These are functional first-pass implementations, flagged for engineering review:
   tables — replace with a specific luminaire's photometric table if required.
 - The circuit distributor applies conventional residential VA ceilings; extend
   with full demand-factor tables per NBR 5410 for commercial/industrial.
-- Voltage-drop and conductor-derating (grouping/temperature) are stubs to be
-  filled from the NBR 5410 tables.
+- Voltage drop is now computed per circuit (`CircuitDistributor::computeVoltageDrops`,
+  run by `EL-WIRE-AUTO`) with a simplified copper/resistive model — shown in the load
+  schedule and single-line diagram. Conductor **derating** (grouping/temperature) is
+  still a stub to be filled from the NBR 5410 tables, and the drop model ignores power
+  factor.
 - The router uses nearest-neighbour ordering + orthogonal/vertical runs; a
   graph-based trace would improve wire-length accuracy and fill calculations.

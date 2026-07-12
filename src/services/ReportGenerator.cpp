@@ -91,7 +91,7 @@ std::string ReportGenerator::legend(const ProjectData& p) {
     if (sw3way)             os << "  Three-way (parallel) switch - fully filled circle\n";
     if (sw4way)             os << "  Four-way (intermediate) switch - half-filled circle\n";
     if (swBell)             os << "  Bell push button - circle w/ filled centre dot\n";
-    if (panelSurface)      os << "  Load panel, surface (aparente) - 2:1 rectangle + diagonal\n";
+    if (panelSurface)      os << "  Load panel, surface (aparente) - 3:1 rectangle + diagonal\n";
     if (panelFlush)        os << "  Load panel, flush (embutido) - as above, ~75% recessed\n";
     os << "  ----  Conduit run\n";
     return os.str();
@@ -161,19 +161,40 @@ std::string ReportGenerator::singleLineDiagram(const ProjectData& p) {
     os << "Utility [" << p.settings.utilityProvider << "] "
        << fmt(p.settings.voltageLineToLine, 0) << "/"
        << fmt(p.settings.voltageLineToNeutral, 0) << " V\n";
-    // Panels and their circuits.
+    // Does any panel own circuit `c`? Used to attribute orphan circuits (panelId
+    // matching no panel) to the main/first panel instead of dropping them.
+    auto panelExists = [&](int id) {
+        for (const auto& e : p.elements)
+            if (e->type == ElementType::Panel &&
+                static_cast<const Panel*>(e.get())->id == id)
+                return true;
+        return false;
+    };
+    // Panels and their circuits (each circuit under the panel it belongs to).
+    bool anyPanel = false;
+    const Panel* mainPanel = nullptr;
+    for (const auto& e : p.elements) {
+        if (e->type != ElementType::Panel) continue;
+        const auto* pn = static_cast<const Panel*>(e.get());
+        if (!mainPanel || pn->isMain) mainPanel = pn;
+    }
     for (const auto& e : p.elements) {
         if (e->type != ElementType::Panel) continue;
         auto* panel = static_cast<Panel*>(e.get());
+        anyPanel = true;
         os << "  +-- " << panel->name << (panel->isMain ? " (main)\n" : "\n");
         for (const auto& c : p.circuits) {
+            const bool owned = (c.panelId == panel->id);
+            const bool orphan = (panel == mainPanel) && !panelExists(c.panelId);
+            if (!owned && !orphan) continue;
             os << "  |     +-- " << c.name << "  "
                << fmt(c.phaseConductorMM2, 1) << "mm2  "
                << fmt(c.breakerAmps, 0) << "A  "
-               << fmt(c.connectedLoadVA, 0) << "VA\n";
+               << fmt(c.connectedLoadVA, 0) << "VA  "
+               << "dV " << fmt(c.voltageDropPct, 2) << "%\n";
         }
     }
-    if (p.elements.empty())
+    if (!anyPanel)
         os << "  (no panels defined)\n";
     return os.str();
 }

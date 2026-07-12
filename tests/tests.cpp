@@ -7,9 +7,15 @@
 
 #include "models/Room.h"
 #include "models/Types.h"
+#include "models/ProjectData.h"
+#include "models/Panel.h"
+#include "models/Outlet.h"
+#include "models/LightPoint.h"
 #include "utilities/PolyMath.h"
 #include "utilities/ElementOutline.h"
 #include "services/LightingCalculator.h"
+#include "services/CircuitDistributor.h"
+#include "services/ReportGenerator.h"
 #include "services/WireCounts.h"
 
 using namespace electrical;
@@ -387,6 +393,133 @@ TEST_CASE(wire_counts_sum_across_shared_circuits) {
     CHECK_EQ(s.neutral, 2);
     CHECK_EQ(s.ground,  2);
     CHECK_EQ(s.retorno, 0);
+}
+
+// ---- Panel <-> circuit linkage & reports (regression) ----------------------
+namespace {
+
+// Counts non-overlapping occurrences of `needle` in `hay`.
+int countOccurrences(const std::string& hay, const std::string& needle) {
+    int n = 0;
+    for (size_t pos = 0; (pos = hay.find(needle, pos)) != std::string::npos; pos += needle.size())
+        ++n;
+    return n;
+}
+
+// A panel with an allocated id, appended to the project. Returns its id.
+int addPanel(ProjectData& p, const std::string& name, bool isMain) {
+    auto panel = std::make_unique<Panel>();
+    panel->id = p.allocPanelId();
+    panel->name = name;
+    panel->isMain = isMain;
+    panel->handle = "PNL" + std::to_string(panel->id);
+    const int id = panel->id;
+    p.elements.push_back(std::move(panel));
+    return id;
+}
+
+// A lighting point with a handle and load, unassigned to a circuit.
+void addLight(ProjectData& p, const std::string& handle, double va) {
+    auto l = std::make_unique<LightPoint>();
+    l->handle = handle;
+    l->powerVA = va;
+    p.elements.push_back(std::move(l));
+}
+
+} // namespace
+
+TEST_CASE(distribute_populates_panel_circuit_list) {
+    ProjectData p;
+    const int mainId = addPanel(p, "QGBT", true);
+    addLight(p, "L1", 100.0);
+    addLight(p, "L2", 100.0);
+
+    const DistributionResult r = CircuitDistributor::distribute(p);
+    CHECK(r.circuitsCreated >= 1);
+
+    // Every created circuit points at the main panel...
+    for (const auto& c : p.circuits) CHECK_EQ(c.panelId, mainId);
+
+    // ...and the panel's circuit list mirrors exactly those circuits.
+    Panel* main = p.findPanel(mainId);
+    CHECK(main != nullptr);
+    CHECK_EQ(static_cast<int>(main->circuitIds.size()),
+             static_cast<int>(p.circuits.size()));
+}
+
+TEST_CASE(single_line_lists_each_circuit_once_under_its_panel) {
+    ProjectData p;
+    const int aId = addPanel(p, "QGBT", true);
+    const int bId = addPanel(p, "QD-1", false);
+
+    Circuit c1; c1.id = p.allocCircuitId(); c1.name = "CKT-A"; c1.panelId = aId;
+    Circuit c2; c2.id = p.allocCircuitId(); c2.name = "CKT-B"; c2.panelId = bId;
+    p.circuits.push_back(c1);
+    p.circuits.push_back(c2);
+
+    const std::string sld = ReportGenerator::singleLineDiagram(p);
+    // Before the fix every circuit was printed under EVERY panel (2x here).
+    CHECK_EQ(countOccurrences(sld, "CKT-A"), 1);
+    CHECK_EQ(countOccurrences(sld, "CKT-B"), 1);
+}
+
+TEST_CASE(single_line_orphan_circuit_falls_under_main) {
+    ProjectData p;
+    addPanel(p, "QGBT", true);
+    Circuit c; c.id = p.allocCircuitId(); c.name = "CKT-X"; c.panelId = 999;  // no such panel
+    p.circuits.push_back(c);
+
+    const std::string sld = ReportGenerator::singleLineDiagram(p);
+    CHECK_EQ(countOccurrences(sld, "CKT-X"), 1);   // shown once, attributed to main
+}
+
+// ---- Voltage drop (simplified NBR 5410) ------------------------------------
+TEST_CASE(voltage_drop_scales_with_length) {
+    ProjectData p;
+    p.settings.phases = Phases::SinglePhase;
+    p.settings.voltageLineToNeutral = 220.0;
+
+    Circuit c; c.id = p.allocCircuitId(); c.panelId = 1;
+    c.connectedLoadVA = 2200.0;        // I = 10 A at 220 V
+    c.phaseConductorMM2 = 2.5;
+    p.circuits.push_back(c);
+
+    // Two 10 m conduits carrying the circuit -> 20 m one-way length.
+    for (int i = 0; i < 2; ++i) {
+        Conduit cd; cd.id = p.allocConduitId(); cd.circuitIds = { c.id }; cd.lengthM = 10.0;
+        p.conduits.push_back(cd);
+    }
+
+    CircuitDistributor::computeVoltageDrops(p);
+    // dV = 2 * 0.0172 * 20 * 10 / 2.5 = 2.752 V -> 1.251 % of 220 V.
+    CHECK_NEAR(p.circuits[0].voltageDropPct, 1.251, 0.05);
+
+    // Doubling the length doubles the drop.
+    for (auto& cd : p.conduits) cd.lengthM = 20.0;
+    CircuitDistributor::computeVoltageDrops(p);
+    CHECK_NEAR(p.circuits[0].voltageDropPct, 2.502, 0.05);
+}
+
+TEST_CASE(voltage_drop_zero_without_conduits) {
+    ProjectData p;
+    Circuit c; c.id = p.allocCircuitId(); c.connectedLoadVA = 1000.0; c.phaseConductorMM2 = 2.5;
+    p.circuits.push_back(c);
+    CircuitDistributor::computeVoltageDrops(p);
+    CHECK_NEAR(p.circuits[0].voltageDropPct, 0.0, 1e-9);
+}
+
+// ---- Flush panel outline is recessed --------------------------------------
+TEST_CASE(flush_panel_outline_is_recessed) {
+    const double kSwR = 0.09, h = 2.0 * kSwR;         // 3:1 panel height = 0.18
+    // Attach from far above: surface panel's top edge sits at y = h; a flush panel
+    // is recessed 0.75h, so its top edge sits at 0.25h - strictly lower.
+    const Point3 surf = outline::nearestAttachPoint(outline::Kind::Panel, 1,
+                            {0, 0, 0}, 0.0, {0, 100, 0}, /*flushPanel=*/false);
+    const Point3 flush = outline::nearestAttachPoint(outline::Kind::Panel, 1,
+                            {0, 0, 0}, 0.0, {0, 100, 0}, /*flushPanel=*/true);
+    CHECK_NEAR(surf.y,  h,         1e-6);
+    CHECK_NEAR(flush.y, 0.25 * h,  1e-6);
+    CHECK(flush.y < surf.y);
 }
 
 int main() {

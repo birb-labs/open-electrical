@@ -3,31 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Relatórios do open-electrical (legenda, quadro de cargas, BOM, unifilar via EL-REPORT) e comandos de remoção (EL-DEL, EL-DEL-ROOM, EL-UNDO).">
 <title>Relatórios &amp; remoção · open-electrical</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
 <link rel="stylesheet" href="style.css">
+<script src="nav.js" defer></script>
 </head>
 <body>
 <div class="layout">
-  <aside>
-    <a href="index.html"><img class="brand-logo" src="assets/open-electrical.svg" alt="open-electrical"></a>
-    <div class="tag">Plugin elétrico para BricsCAD · BRX / C++</div>
-    <nav>
-      <a href="index.html">Início</a>
-      <div class="group">Fundamentos</div>
-      <a href="fundamentos.html#requisitos">Requisitos</a>
-      <a href="fundamentos.html#estrutura">Estrutura do projeto</a>
-      <a href="fundamentos.html#tecnologias">Tecnologias</a>
-      <a href="fundamentos.html#logica">Lógica geral</a>
-      <div class="group">Comandos</div>
-      <a href="elementos.html">Elementos &amp; símbolos</a>
-      <a href="calculo.html">Cálculo &amp; circuitos</a>
-      <a href="roteamento.html">Eletrodutos &amp; roteamento</a>
-      <a href="el-wire.html">Fiação (EL-WIRE)</a>
-      <a href="relatorios.html" class="active">Relatórios &amp; remoção</a>
-      <div class="group">Interface</div>
-      <a href="interface.html">Paleta, config &amp; i18n</a>
-    </nav>
-  </aside>
+  <aside data-nav></aside>
 
   <main>
     <h1>Relatórios &amp; remoção</h1>
@@ -44,9 +28,9 @@
     <table>
       <tr><th>Opção</th><th>Documento</th><th>Gerador</th></tr>
       <tr><td>Legend</td><td>Legenda: símbolo → descrição de cada tipo usado no projeto</td><td><code>ReportGenerator::legend()</code></td></tr>
-      <tr><td>Loads</td><td>Quadro de cargas: uma linha por circuito com dimensionamento</td><td><code>ReportGenerator::loadSchedule()</code></td></tr>
+      <tr><td>Loads</td><td>Quadro de cargas: uma linha por circuito com dimensionamento (inclui a coluna <b>V-drop %</b>, a queda de tensão calculada por <a href="calculo.html#queda">EL-WIRE-AUTO</a>)</td><td><code>ReportGenerator::loadSchedule()</code></td></tr>
       <tr><td>Bom</td><td>Lista de materiais: quantidades agregadas de dispositivos, eletroduto e fio</td><td><code>ReportGenerator::billOfMaterialsText()</code></td></tr>
-      <tr><td>Sld</td><td>Diagrama unifilar (descrição/netlist textual)</td><td><code>ReportGenerator::singleLineDiagram()</code></td></tr>
+      <tr><td>Sld</td><td>Diagrama unifilar (netlist textual): cada circuito sob o <b>seu</b> quadro (por <code>panelId</code>), com seção, disjuntor, carga e queda de tensão</td><td><code>ReportGenerator::singleLineDiagram()</code></td></tr>
       <tr><td>All</td><td>Emite os quatro, empilhados (passo <code>dy = 4.0</code>)</td><td>—</td></tr>
     </table>
 
@@ -58,6 +42,11 @@
     <h2 id="el-single-line">EL-SINGLE-LINE — diagrama unifilar direto</h2>
     <span class="filepath">src/commands/ReportCommands.cpp — generateSingleLine()</span>
     <p>Atalho para inserir só o unifilar (<code>ReportGenerator::singleLineDiagram()</code>).</p>
+    <div class="note">O unifilar lista cada circuito <b>uma única vez</b>, sob o quadro a que
+    pertence (comparação por <code>Circuit::panelId == Panel::id</code>). Circuitos cujo
+    <code>panelId</code> não corresponde a nenhum quadro (dados antigos) são atribuídos ao quadro
+    principal. Para isso funcionar, insira os quadros com <kbd>EL-PANEL</kbd> (que aloca o
+    <code>Panel::id</code>) e rode <kbd>EL-CIRCUIT-AUTO</kbd>.</div>
 
     <div class="note">Cada relatório é montado a partir do estado atual de
     <code>ProjectData</code>. Para relatórios corretos, rode antes a distribuição

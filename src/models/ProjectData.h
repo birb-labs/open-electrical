@@ -35,10 +35,12 @@ public:
     int nextRoomId    = 1;
     int nextCircuitId = 1;
     int nextConduitId = 1;
+    int nextPanelId   = 1;
 
     int allocRoomId()    { return nextRoomId++; }
     int allocCircuitId() { return nextCircuitId++; }
     int allocConduitId() { return nextConduitId++; }
+    int allocPanelId()   { return nextPanelId++; }
 
     // ---- lookups ---------------------------------------------------------
     Room*    findRoom(int id);

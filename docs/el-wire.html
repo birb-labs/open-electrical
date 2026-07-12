@@ -3,37 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="EL-WIRE / EL-WIRE-AUTO no open-electrical: como o comando conta os condutores por circuito e desenha o balão de fiação (Fase/Neutro/Terra/Retorno).">
 <title>EL-WIRE / EL-WIRE-AUTO · open-electrical</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
 <link rel="stylesheet" href="style.css">
+<script src="nav.js" defer></script>
 </head>
 <body>
 <div class="layout">
-  <aside>
-    <a href="index.html"><img class="brand-logo" src="assets/open-electrical.svg" alt="open-electrical"></a>
-    <div class="tag">Plugin elétrico para BricsCAD · BRX / C++</div>
-    <nav>
-      <a href="index.html">Início</a>
-      <div class="group">Fundamentos</div>
-      <a href="fundamentos.html#requisitos">Requisitos</a>
-      <a href="fundamentos.html#estrutura">Estrutura do projeto</a>
-      <a href="fundamentos.html#tecnologias">Tecnologias</a>
-      <a href="fundamentos.html#logica">Lógica geral</a>
-      <div class="group">Comandos</div>
-      <a href="elementos.html">Elementos &amp; símbolos</a>
-      <a href="calculo.html">Cálculo &amp; circuitos</a>
-      <a href="roteamento.html">Eletrodutos &amp; roteamento</a>
-      <a href="el-wire.html" class="active">Fiação (EL-WIRE)</a>
-      <a href="#fluxo">&nbsp;&nbsp;Fluxo do comando</a>
-      <a href="#condutores">&nbsp;&nbsp;Contagem de condutores</a>
-      <a href="#baloes">&nbsp;&nbsp;Anatomia do balão</a>
-      <a href="#simbologias">&nbsp;&nbsp;Formato das simbologias</a>
-      <a href="#modificar">&nbsp;&nbsp;Como modificar</a>
-      <a href="#flip">&nbsp;&nbsp;EL-WIRE-FLIP</a>
-      <a href="relatorios.html">Relatórios &amp; remoção</a>
-      <div class="group">Interface</div>
-      <a href="interface.html">Paleta, config &amp; i18n</a>
-    </nav>
-  </aside>
+  <aside data-nav></aside>
 
   <main>
     <h1>EL-WIRE / EL-WIRE-AUTO</h1>
@@ -54,7 +32,7 @@
     eletroduto sem circuito associado não carrega condutores e, portanto, não recebe balão.</div>
 
     <h2 id="fluxo">Fluxo do comando</h2>
-    <span class="filepath">src/commands/CircuitCommands.cpp — routeWireAuto()</span>
+    <span class="filepath">src/commands/CircuitCommands.cpp — routeWireAuto() (trecho simplificado)</span>
 <pre><code>void routeWireAuto() {
     ProjectData&amp; project = ProjectContext::instance().project();
     if (project.conduits.empty()) { acutPrintf(_T("\nNo conduits yet...")); return; }
@@ -64,9 +42,16 @@
     const int drawn = refreshWiringBalloons(project);  // 2. (re)desenha os balões
     ProjectContext::instance().save();          // 3. persiste
 
+    // Soma o comprimento de todos os condutores puxados (para o resumo).
+    double totalWire = 0.0;
+    for (const auto&amp; c : project.conduits)
+        for (const auto&amp; w : c.wires) totalWire += w.lengthM;
+
     acutPrintf(_T("\nEL-WIRE: %d conduit(s), %d circuit(s), %d wiring tag(s) drawn (%.2f m).\n"),
                (int)project.conduits.size(), (int)project.circuits.size(), drawn, totalWire);
 }</code></pre>
+    <span class="snippet-note">Trecho simplificado: o fonte também imprime uma dica quando
+    <code>drawn == 0</code> (rode <kbd>EL-CIRCUIT-AUTO</kbd> antes).</span>
     <p>A linha impressa é o seu <b>diagnóstico</b>: se aparecer <code>0 circuit(s)</code> ou
     <code>0 wiring tag(s)</code>, o problema é de dados (rode <kbd>EL-CIRCUIT-AUTO</kbd> antes),
     não de desenho.</p>

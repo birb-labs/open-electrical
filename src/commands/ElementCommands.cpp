@@ -445,6 +445,7 @@ void insertPanel() {
 
     UndoGroup undo(_T("EL-PANEL"));
     auto panel = std::make_unique<Panel>(cfg);
+    if (panel->id < 0) panel->id = project.allocPanelId();   // stable id for Circuit::panelId
     panel->position = p;
     panel->handle = insertSymbol(blockNameFor(*panel).c_str(), layerFor(*panel), p,
                                  scaleFor(*panel), rot, attrsFor(*panel));

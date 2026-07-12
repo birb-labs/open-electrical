@@ -54,6 +54,11 @@ enum class OutletPurpose : uint8_t { General, Specific };
 enum class SwitchKind : uint8_t { OneSection, TwoSection, ThreeSection, ThreeWay, FourWay, Bell };
 
 // Circuit category, used by the automatic distributor and load schedule.
+// The automatic distributor currently creates only Lighting, GeneralOutlets and
+// SpecificOutlets circuits. Motor and Mixed are RESERVED: their conductor counts
+// (WireCounts.h) and conductor sizing (CircuitDistributor) are already defined,
+// but there is no automatic creation path yet - they are produced only if a
+// circuit is assigned one of these types manually / by a future command.
 enum class CircuitType : uint8_t { Lighting, GeneralOutlets, SpecificOutlets, Motor, Mixed };
 
 inline const char* toKey(Unit u) {

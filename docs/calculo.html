@@ -3,31 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Cálculo luminotécnico (método dos lúmens, EL-CALC-LIGHT) e distribuição automática de circuitos (EL-CIRCUIT-AUTO) no open-electrical.">
 <title>Cálculo &amp; circuitos · open-electrical</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
 <link rel="stylesheet" href="style.css">
+<script src="nav.js" defer></script>
 </head>
 <body>
 <div class="layout">
-  <aside>
-    <a href="index.html"><img class="brand-logo" src="assets/open-electrical.svg" alt="open-electrical"></a>
-    <div class="tag">Plugin elétrico para BricsCAD · BRX / C++</div>
-    <nav>
-      <a href="index.html">Início</a>
-      <div class="group">Fundamentos</div>
-      <a href="fundamentos.html#requisitos">Requisitos</a>
-      <a href="fundamentos.html#estrutura">Estrutura do projeto</a>
-      <a href="fundamentos.html#tecnologias">Tecnologias</a>
-      <a href="fundamentos.html#logica">Lógica geral</a>
-      <div class="group">Comandos</div>
-      <a href="elementos.html">Elementos &amp; símbolos</a>
-      <a href="calculo.html" class="active">Cálculo &amp; circuitos</a>
-      <a href="roteamento.html">Eletrodutos &amp; roteamento</a>
-      <a href="el-wire.html">Fiação (EL-WIRE)</a>
-      <a href="relatorios.html">Relatórios &amp; remoção</a>
-      <div class="group">Interface</div>
-      <a href="interface.html">Paleta, config &amp; i18n</a>
-    </nav>
-  </aside>
+  <aside data-nav></aside>
 
   <main>
     <h1>Cálculo &amp; circuitos</h1>
@@ -35,12 +19,17 @@
     (método dos lúmens, NBR 5413) que posiciona as luminárias, e a distribuição automática de
     circuitos (NBR 5410) que agrupa os elementos em circuitos e dimensiona condutor/disjuntor.</p>
 
-    <h2 id="el-calc-light">EL-CALC-LIGHT / EL-LIGHT-AUTO — método dos lúmens</h2>
-    <span class="filepath">src/commands/ElementCommands.cpp — runLightingCalc() → placeLightsInRoom()</span>
-    <p>Ambos chamam <code>runLightingCalc()</code>: listam os ambientes para o usuário escolher um
-    (ou "Todos"), perguntam a luminária (fluxo/potência) e rodam o método dos lúmens por ambiente,
-    usando os <b>parâmetros do próprio ambiente</b> (refletâncias, fator de manutenção, plano de
-    trabalho, contraste — nada é global). As luminárias são inseridas numa grade uniforme.</p>
+    <h2 id="el-calc-light">EL-CALC-LIGHT — método dos lúmens</h2>
+    <span class="filepath">src/commands/ElementCommands.cpp — calcLightingAuto() → runLightingCalc() → placeLightsInRoom()</span>
+    <p>O comando lista os ambientes para o usuário escolher um (ou "Todos"), pergunta a luminária
+    (fluxo/potência) e roda o método dos lúmens por ambiente, usando os <b>parâmetros do próprio
+    ambiente</b> (refletâncias, fator de manutenção, plano de trabalho, contraste — nada é global).
+    As luminárias são inseridas numa grade uniforme recortada pelo polígono do cômodo.</p>
+    <div class="warn"><b>Nome do comando.</b> O único comando registrado é <code>EL-CALC-LIGHT</code>.
+    A função interna <code>runLightingCalc()</code> aceita um rótulo de <i>undo</i>
+    (<code>EL-LIGHT-AUTO</code> era o rótulo previsto para um segundo comando), mas <b>não há</b> um
+    comando <code>EL-LIGHT-AUTO</code> na tabela de <code>Commands.cpp</code> — digitar esse nome
+    resulta em "Unknown command". Para expor um alias, adicione a linha correspondente na tabela.</div>
     <div class="note">A iluminância-alvo é <b>derivada</b> do uso do ambiente + contraste
     (NBR 5413), não digitada. Pré-requisito: existir ao menos um ambiente (<kbd>EL-ROOM</kbd>)
     com uso/pé-direito definidos.</div>
@@ -110,8 +99,30 @@ for (auto&amp; e : project.elements) {
       <tr><td>Seção mínima de condutor por tipo de circuito</td><td><code>CircuitDistributor::minConductorMM2()</code></td></tr>
       <tr><td>Escolha do disjuntor por seção</td><td><code>CircuitDistributor::breakerFor()</code></td></tr>
       <tr><td>Quantos condutores (F/N/PE/R) cada tipo carrega</td><td><code>conductorsFor()</code> em <code>WireCounts.h</code> — impacta a fiação (veja <a href="el-wire.html#condutores">EL-WIRE</a>)</td></tr>
-      <tr><td>Quadro que recebe os novos circuitos</td><td><code>DistributionOptions.targetPanelId</code> (-1 = primeiro/geral)</td></tr>
+      <tr><td>Quadro que recebe os novos circuitos</td><td><code>DistributionOptions.targetPanelId</code> (-1 = quadro principal/geral)</td></tr>
+      <tr><td>Cálculo da queda de tensão</td><td><code>CircuitDistributor::computeVoltageDrops()</code> (ρ do cobre, k por nº de fases)</td></tr>
     </table>
+
+    <h3 id="queda">Vínculo quadro↔circuito e queda de tensão</h3>
+    <p>Cada quadro tem um <b>id próprio</b> (<code>Panel::id</code>) e cada circuito aponta para o
+    seu quadro via <code>Circuit::panelId</code>. Após distribuir, o <code>CircuitDistributor</code>
+    reconstrói a lista <code>Panel::circuitIds</code> de cada quadro — é ela que preenche o atributo
+    <code>CIRCUITOS</code> do símbolo do quadro e o agrupamento do <a href="relatorios.html#el-single-line">unifilar</a>.</p>
+    <p>A <b>queda de tensão</b> por circuito (<code>Circuit::voltageDropPct</code>) é calculada por
+    <code>computeVoltageDrops()</code>, chamada dentro de <code>EL-WIRE-AUTO</code> (quando os
+    comprimentos dos eletrodutos já são conhecidos). O modelo é simplificado — NBR 5410, cobre,
+    carga resistiva:</p>
+<pre><code>ΔV = k · ρ · L · I / S        ΔV% = 100 · ΔV / V_ref
+  ρ = 0,0172 Ω·mm²/m (cobre)   k = 2 (mono/bifásico) | √3 (trifásico)
+  L = soma dos eletrodutos do circuito   I = carga / V_ref   S = seção da fase</code></pre>
+    <span class="snippet-note">Simplificado: ignora fator de potência e derating por temperatura/agrupamento.
+    Para precisão, substitua pelas tabelas completas da NBR 5410.</span>
+
+    <div class="note"><b>Tipos de circuito reservados.</b> A distribuição automática cria apenas
+    <code>Lighting</code>, <code>GeneralOutlets</code> e <code>SpecificOutlets</code>. Os tipos
+    <code>Motor</code> e <code>Mixed</code> estão <b>reservados</b>: as contagens de condutor
+    (<code>WireCounts.h</code>) e o dimensionamento já existem, mas ainda não há caminho de criação
+    automática — só surgem se um circuito for marcado manualmente / por um comando futuro.</div>
 
     <div class="note"><b>Ordem recomendada de trabalho:</b> <kbd>EL-ROOM</kbd> →
     <kbd>EL-CALC-LIGHT</kbd> / colocar tomadas → <kbd>EL-CIRCUIT-AUTO</kbd> →

@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Guia do primeiro projeto no open-electrical: a sequência completa de comandos, do desenho vazio ao quadro de cargas, com o que esperar em cada passo.">
+<title>Guia: primeiro projeto · open-electrical</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
+<link rel="stylesheet" href="style.css">
+<script src="nav.js" defer></script>
+</head>
+<body>
+<div class="layout">
+  <aside data-nav></aside>
+
+  <main>
+    <h1>Guia: o seu primeiro projeto</h1>
+    <p class="lead">Do desenho vazio ao quadro de cargas. Cada etapa depende dos dados da
+    anterior — siga a ordem. Todos os comandos são digitados na linha de comando do BricsCAD
+    (ou pelos botões da paleta <kbd>EL</kbd>).</p>
+
+    <div class="note"><b>Antes de começar.</b> Carregue o plugin
+    (<a href="fundamentos.html#requisitos">APPLOAD do <code>.lrx</code></a>) e abra a paleta com
+    <kbd>EL</kbd>. Opcional, mas recomendado: rode <kbd>EL-CONFIG</kbd> para definir tensão,
+    aterramento, material de eletroduto e idioma antes de desenhar — veja
+    <a href="interface.html#el-config">EL-CONFIG</a>.</div>
+
+    <div class="step">
+      <h3>1. <span class="cmd">EL-ROOM</span> — demarque os ambientes</h3>
+      <p>Clique os cantos de cada cômodo (mínimo 3); <kbd>Enter</kbd> fecha o contorno,
+      <kbd>Undo</kbd> remove o último canto. Ao fechar, o <b>diálogo do ambiente</b> pede nome,
+      uso (Sala, Quarto, Cozinha…), pé-direito e os parâmetros luminotécnicos.</p>
+      <p><b>Por que primeiro:</b> o ambiente é a base de tudo — o cálculo de luz, as tomadas
+      automáticas e os interruptores automáticos iteram sobre <code>project.rooms</code>. Sem
+      ambiente, esses comandos avisam "No rooms defined" e não fazem nada.</p>
+      <p><b>Esperado:</b> <code>Room "Sala": 4 corners, area = 12.00 m2.</code></p>
+    </div>
+
+    <div class="step">
+      <h3>2. <span class="cmd">EL-CALC-LIGHT</span> — posicione os pontos de luz</h3>
+      <p>Escolha um ambiente (ou "Todos") e a luminária (fluxo/potência). O método dos lúmens
+      calcula quantas luminárias cada cômodo precisa e as distribui numa grade recortada pelo
+      polígono. Veja a fórmula em <a href="calculo.html#el-calc-light">Cálculo</a>.</p>
+      <p><b>Alternativa manual:</b> <kbd>EL-LIGHT</kbd> insere um ponto de luz de cada vez (teto
+      ou arandela), com diálogo próprio.</p>
+      <p><b>Esperado:</b> <code>Room "Sala": 4 luminaire(s), E=150 lux (achieved 168), A=12.00 m2,
+      K=0.85, CU=0.52.</code> As luminárias automáticas nascem com comando <code>"A"</code> e
+      circuito <code>"?"</code> — refinados nos passos seguintes.</p>
+    </div>
+
+    <div class="step">
+      <h3>3. Tomadas e interruptores</h3>
+      <p><kbd>EL-OUTLET-AUTO</kbd> distribui tomadas pelo perímetro de cada ambiente (critério
+      simplificado da NBR 5410: ≥ 1 a cada 5 m; 3,5 m em cozinha/área de serviço).
+      <kbd>EL-SWITCH-AUTO</kbd> coloca um interruptor junto à primeira porta de cada cômodo e o
+      vincula aos pontos de luz dali. Para casos específicos, use os manuais <kbd>EL-OUTLET</kbd>
+      e <kbd>EL-SWITCH</kbd>. Detalhes em <a href="elementos.html#el-outlet">Elementos</a>.</p>
+      <p><b>Esperado:</b> <code>Room "Cozinha": 4 outlet(s) (perimeter 14.0 m).</code></p>
+    </div>
+
+    <div class="step">
+      <h3>4. <span class="cmd">EL-PANEL</span> — coloque o quadro</h3>
+      <p>O <b>primeiro</b> quadro é assumido como o geral (QGBT); os seguintes, como quadros de
+      distribuição (QD). O roteamento parte do quadro em direção aos pontos, então coloque ao menos
+      um antes de rotear. Veja <a href="elementos.html#el-panel">EL-PANEL</a>.</p>
+    </div>
+
+    <div class="step">
+      <h3>5. <span class="cmd">EL-CIRCUIT-AUTO</span> — distribua os circuitos</h3>
+      <p>Agrupa os elementos em circuitos (iluminação e tomadas nunca juntas; cada TUE ganha o seu),
+      dimensiona condutor/disjuntor e <b>escreve o número do circuito</b> no atributo
+      <code>CIRCUITO</code> de cada símbolo já desenhado. Regras em
+      <a href="calculo.html#el-circuit">Cálculo</a>.</p>
+      <p><b>Por que aqui:</b> o roteamento e a fiação leem <code>circuitId</code>. Se você rotear
+      antes de distribuir, os eletrodutos não sabem que circuitos carregam e a fiação sai vazia.</p>
+      <p><b>Esperado:</b> <code>3 circuit(s) created, 12 element(s) assigned, 12 CIRCUITO
+      notation(s) updated.</code></p>
+    </div>
+
+    <div class="step">
+      <h3>6. <span class="cmd">EL-CONDUIT-AUTO</span> — roteie os eletrodutos</h3>
+      <p>Pergunta se deve omitir os eletrodutos horizontais (só descidas verticais — um estilo
+      comum de documentação) e conecta cada circuito de volta ao quadro. Os eletrodutos são
+      polilinhas 3D (as descidas diferem só em Z). Detalhes em
+      <a href="roteamento.html#el-conduit-auto">Roteamento</a>.</p>
+      <p>Para trechos manuais entre dois componentes, use <kbd>EL-CONDUIT</kbd> e ajuste com
+      <kbd>EL-CONDUIT-EDIT</kbd>.</p>
+      <p><b>Esperado:</b> <code>7 conduit(s) routed, total 24.30 m.</code></p>
+    </div>
+
+    <div class="step">
+      <h3>7. <span class="cmd">EL-WIRE-AUTO</span> — puxe a fiação</h3>
+      <p>Calcula quantos condutores (Fase/Neutro/Terra/Retorno) passam por cada eletroduto e
+      desenha o "balão" de fiação dentro de cada trecho. É idempotente: pode rodar de novo a
+      qualquer momento. Mergulho completo em <a href="el-wire.html">Fiação (EL-WIRE)</a>.</p>
+      <p><b>Atalho:</b> <kbd>EL-ROUTE-AUTO</kbd> faz os passos 6 e 7 de uma vez.
+      <kbd>EL-WIRE-FLIP</kbd> espelha um balão que ficou sobre outra geometria.</p>
+      <p><b>Esperado:</b> <code>EL-WIRE: 7 conduit(s), 3 circuit(s), 6 wiring tag(s) drawn
+      (48.60 m).</code> Se aparecer <code>0 wiring tag(s)</code>, volte ao passo 5.</p>
+    </div>
+
+    <div class="step">
+      <h3>8. <span class="cmd">EL-REPORT</span> — emita os documentos</h3>
+      <p>Escolha <b>[Legend/Loads/Bom/Sld/All]</b> e um ponto de inserção. Sai a legenda, o quadro
+      de cargas, a lista de materiais e o unifilar (textual) como blocos de <code>MText</code>.
+      Atalhos: <kbd>EL-LOAD-SCHEDULE</kbd> e <kbd>EL-SINGLE-LINE</kbd>. Veja
+      <a href="relatorios.html#el-report">Relatórios</a>.</p>
+    </div>
+
+    <h2 id="resumo">Resumo da sequência</h2>
+    <table>
+      <tr><th>#</th><th>Comando</th><th>Produz</th><th>Depende de</th></tr>
+      <tr><td>1</td><td><kbd>EL-ROOM</kbd></td><td>Ambientes</td><td>—</td></tr>
+      <tr><td>2</td><td><kbd>EL-CALC-LIGHT</kbd></td><td>Pontos de luz</td><td>ambientes</td></tr>
+      <tr><td>3</td><td><kbd>EL-OUTLET-AUTO</kbd> / <kbd>EL-SWITCH-AUTO</kbd></td><td>Tomadas / interruptores</td><td>ambientes</td></tr>
+      <tr><td>4</td><td><kbd>EL-PANEL</kbd></td><td>Quadro (QGBT)</td><td>—</td></tr>
+      <tr><td>5</td><td><kbd>EL-CIRCUIT-AUTO</kbd></td><td>Circuitos + dimensionamento</td><td>elementos</td></tr>
+      <tr><td>6</td><td><kbd>EL-CONDUIT-AUTO</kbd></td><td>Eletrodutos</td><td>circuitos + quadro</td></tr>
+      <tr><td>7</td><td><kbd>EL-WIRE-AUTO</kbd></td><td>Balões de fiação</td><td>eletrodutos + circuitos</td></tr>
+      <tr><td>8</td><td><kbd>EL-REPORT</kbd></td><td>Legenda / cargas / BOM / unifilar</td><td>tudo acima</td></tr>
+    </table>
+    <div class="note">Errou um passo? <kbd>EL-UNDO</kbd> desfaz a última ação do plugin (e
+    recarrega o modelo). Para remover componentes/eletrodutos específicos, <kbd>EL-DEL</kbd>; para
+    editar um componente já inserido, <kbd>EL-EDIT</kbd>. Se algo não aparece como esperado, veja
+    <a href="troubleshooting.html">Problemas comuns</a>.</div>
+
+    <footer>open-electrical · Guia do primeiro projeto</footer>
+  </main>
+</div>
+</body>
+</html>

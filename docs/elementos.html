@@ -3,31 +3,15 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Comandos de elementos do open-electrical (EL-ROOM, EL-LIGHT, EL-OUTLET, EL-SWITCH, EL-PANEL, EL-EDIT) e a SymbolFactory que gera os símbolos NBR 5444.">
 <title>Elementos &amp; símbolos · open-electrical</title>
+<link rel="icon" type="image/svg+xml" href="assets/logo.svg">
 <link rel="stylesheet" href="style.css">
+<script src="nav.js" defer></script>
 </head>
 <body>
 <div class="layout">
-  <aside>
-    <a href="index.html"><img class="brand-logo" src="assets/open-electrical.svg" alt="open-electrical"></a>
-    <div class="tag">Plugin elétrico para BricsCAD · BRX / C++</div>
-    <nav>
-      <a href="index.html">Início</a>
-      <div class="group">Fundamentos</div>
-      <a href="fundamentos.html#requisitos">Requisitos</a>
-      <a href="fundamentos.html#estrutura">Estrutura do projeto</a>
-      <a href="fundamentos.html#tecnologias">Tecnologias</a>
-      <a href="fundamentos.html#logica">Lógica geral</a>
-      <div class="group">Comandos</div>
-      <a href="elementos.html" class="active">Elementos &amp; símbolos</a>
-      <a href="calculo.html">Cálculo &amp; circuitos</a>
-      <a href="roteamento.html">Eletrodutos &amp; roteamento</a>
-      <a href="el-wire.html">Fiação (EL-WIRE)</a>
-      <a href="relatorios.html">Relatórios &amp; remoção</a>
-      <div class="group">Interface</div>
-      <a href="interface.html">Paleta, config &amp; i18n</a>
-    </nav>
-  </aside>
+  <aside data-nav></aside>
 
   <main>
     <h1>Elementos &amp; símbolos</h1>
@@ -116,6 +100,143 @@ cfg.name   = cfg.isMain ? "QGBT" : "QD";</code></pre>
     <div class="note">A mesma função <code>syncElementAttributes()</code> é usada por
     <kbd>EL-CIRCUIT-AUTO</kbd> para empurrar o número de circuito recém-atribuído para o
     atributo <code>CIRCUITO</code> dos símbolos já desenhados.</div>
+
+    <h2 id="galeria">Galeria dos símbolos (NBR 5444)</h2>
+    <p>Reprodução esquemática da geometria que a <code>SymbolFactory</code> desenha (mesmas
+    proporções: a parede é a linha inferior <code>y=0</code>, e <b>+Y aponta para dentro do
+    ambiente</b>). Todas as dimensões derivam de <code>kSymUnit = 0.09</code> — o raio do círculo
+    do interruptor. O lado do triângulo da tomada é igual ao diâmetro do interruptor
+    (<code>2·kSymUnit</code>); o círculo do ponto de luz é maior (<code>1.6·kSymUnit</code>).</p>
+
+    <div class="glyph-demo">
+      <figure>
+        <svg width="130" height="112" viewBox="0 0 130 112">
+          <line x1="6" y1="104" x2="124" y2="104" stroke="#5b6673" stroke-width="1.5"/>
+          <circle cx="65" cy="52" r="37" fill="none" stroke="#cbd5e1" stroke-width="2"/>
+          <line x1="28" y1="52" x2="102" y2="52" stroke="#cbd5e1" stroke-width="2"/>
+          <line x1="65" y1="52" x2="65" y2="89" stroke="#cbd5e1" stroke-width="2"/>
+        </svg>
+        <figcaption>Ponto de luz no teto (<code>EL_LIGHT</code>) — círculo com corda horizontal + haste ao polo sul</figcaption>
+      </figure>
+      <figure>
+        <svg width="130" height="112" viewBox="0 0 130 112">
+          <line x1="6" y1="104" x2="124" y2="104" stroke="#5b6673" stroke-width="1.5"/>
+          <path d="M 28 104 A 37 37 0 0 1 102 104" fill="none" stroke="#cbd5e1" stroke-width="2"/>
+          <line x1="28" y1="104" x2="102" y2="104" stroke="#cbd5e1" stroke-width="2"/>
+          <line x1="65" y1="104" x2="65" y2="67" stroke="#cbd5e1" stroke-width="2"/>
+        </svg>
+        <figcaption>Arandela / luz de parede (<code>EL_LIGHT_WALL</code>) — meio-disco sobre a parede</figcaption>
+      </figure>
+      <figure>
+        <svg width="130" height="112" viewBox="0 0 130 112">
+          <line x1="6" y1="104" x2="124" y2="104" stroke="#5b6673" stroke-width="1.5"/>
+          <line x1="65" y1="104" x2="65" y2="92" stroke="#cbd5e1" stroke-width="2"/>
+          <path d="M 44 92 L 86 92 L 65 52 Z" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-linejoin="round"/>
+        </svg>
+        <figcaption>Tomada baixa (<code>EL_OUTLET_L</code>) — triângulo vazio, ≤ 0,6 m</figcaption>
+      </figure>
+      <figure>
+        <svg width="130" height="112" viewBox="0 0 130 112">
+          <line x1="6" y1="104" x2="124" y2="104" stroke="#5b6673" stroke-width="1.5"/>
+          <line x1="65" y1="104" x2="65" y2="92" stroke="#cbd5e1" stroke-width="2"/>
+          <path d="M 65 92 L 86 92 L 65 52 Z" fill="#cbd5e1"/>
+          <path d="M 44 92 L 86 92 L 65 52 Z" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-linejoin="round"/>
+        </svg>
+        <figcaption>Tomada média (<code>EL_OUTLET_M</code>) — metade direita preenchida, &lt; 1,5 m</figcaption>
+      </figure>
+      <figure>
+        <svg width="130" height="112" viewBox="0 0 130 112">
+          <line x1="6" y1="104" x2="124" y2="104" stroke="#5b6673" stroke-width="1.5"/>
+          <line x1="65" y1="104" x2="65" y2="92" stroke="#cbd5e1" stroke-width="2"/>
+          <path d="M 44 92 L 86 92 L 65 52 Z" fill="#cbd5e1" stroke="#cbd5e1" stroke-width="2" stroke-linejoin="round"/>
+        </svg>
+        <figcaption>Tomada alta (<code>EL_OUTLET_H</code>) — totalmente preenchida, ≥ 1,5 m</figcaption>
+      </figure>
+      <figure>
+        <svg width="130" height="112" viewBox="0 0 130 112">
+          <line x1="6" y1="104" x2="124" y2="104" stroke="#5b6673" stroke-width="1.5"/>
+          <line x1="65" y1="104" x2="65" y2="92" stroke="#cbd5e1" stroke-width="2"/>
+          <path d="M 44 92 L 86 92 L 65 62 Z" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M 44 62 L 86 62 L 65 32 Z" fill="none" stroke="#cbd5e1" stroke-width="2" stroke-linejoin="round"/>
+        </svg>
+        <figcaption>Cadeia de 2 módulos (<code>EL_OUTLET_L_M</code>) — triângulos encadeados ápice-a-base</figcaption>
+      </figure>
+      <figure>
+        <svg width="130" height="112" viewBox="0 0 130 112">
+          <line x1="6" y1="104" x2="124" y2="104" stroke="#5b6673" stroke-width="1.5"/>
+          <line x1="65" y1="104" x2="65" y2="88" stroke="#cbd5e1" stroke-width="2"/>
+          <circle cx="65" cy="65" r="23" fill="none" stroke="#cbd5e1" stroke-width="2"/>
+        </svg>
+        <figcaption>Interruptor 1 seção (<code>EL_SWITCH_1</code>) — círculo com haste à parede</figcaption>
+      </figure>
+      <figure>
+        <svg width="130" height="112" viewBox="0 0 130 112">
+          <line x1="6" y1="104" x2="124" y2="104" stroke="#5b6673" stroke-width="1.5"/>
+          <line x1="65" y1="104" x2="65" y2="88" stroke="#cbd5e1" stroke-width="2"/>
+          <circle cx="65" cy="65" r="23" fill="none" stroke="#cbd5e1" stroke-width="2"/>
+          <line x1="65" y1="42" x2="65" y2="88" stroke="#cbd5e1" stroke-width="2"/>
+        </svg>
+        <figcaption>Interruptor 2 seções (<code>EL_SWITCH_2</code>) — 1 divisor pelo polo inferior</figcaption>
+      </figure>
+      <figure>
+        <svg width="130" height="112" viewBox="0 0 130 112">
+          <line x1="6" y1="104" x2="124" y2="104" stroke="#5b6673" stroke-width="1.5"/>
+          <line x1="65" y1="104" x2="65" y2="88" stroke="#cbd5e1" stroke-width="2"/>
+          <circle cx="65" cy="65" r="23" fill="none" stroke="#cbd5e1" stroke-width="2"/>
+          <line x1="65" y1="65" x2="65" y2="88" stroke="#cbd5e1" stroke-width="2"/>
+          <line x1="65" y1="65" x2="85" y2="53.5" stroke="#cbd5e1" stroke-width="2"/>
+          <line x1="65" y1="65" x2="45" y2="53.5" stroke="#cbd5e1" stroke-width="2"/>
+        </svg>
+        <figcaption>Interruptor 3 seções (<code>EL_SWITCH_3</code>) — 3 fatias de 120°</figcaption>
+      </figure>
+      <figure>
+        <svg width="130" height="112" viewBox="0 0 130 112">
+          <line x1="6" y1="104" x2="124" y2="104" stroke="#5b6673" stroke-width="1.5"/>
+          <line x1="65" y1="104" x2="65" y2="88" stroke="#cbd5e1" stroke-width="2"/>
+          <circle cx="65" cy="65" r="23" fill="#cbd5e1" stroke="#cbd5e1" stroke-width="2"/>
+        </svg>
+        <figcaption>Paralelo / three-way (<code>EL_SWITCH_3WAY</code>) — círculo preenchido</figcaption>
+      </figure>
+      <figure>
+        <svg width="130" height="112" viewBox="0 0 130 112">
+          <line x1="6" y1="104" x2="124" y2="104" stroke="#5b6673" stroke-width="1.5"/>
+          <line x1="65" y1="104" x2="65" y2="88" stroke="#cbd5e1" stroke-width="2"/>
+          <path d="M 65 42 A 23 23 0 0 1 65 88 Z" fill="#cbd5e1"/>
+          <circle cx="65" cy="65" r="23" fill="none" stroke="#cbd5e1" stroke-width="2"/>
+        </svg>
+        <figcaption>Intermediário / four-way (<code>EL_SWITCH_4WAY</code>) — meio círculo preenchido</figcaption>
+      </figure>
+      <figure>
+        <svg width="130" height="112" viewBox="0 0 130 112">
+          <line x1="6" y1="104" x2="124" y2="104" stroke="#5b6673" stroke-width="1.5"/>
+          <line x1="65" y1="104" x2="65" y2="88" stroke="#cbd5e1" stroke-width="2"/>
+          <circle cx="65" cy="65" r="23" fill="none" stroke="#cbd5e1" stroke-width="2"/>
+          <circle cx="65" cy="65" r="6.5" fill="#cbd5e1"/>
+        </svg>
+        <figcaption>Campainha (<code>EL_SWITCH_BELL</code>) — círculo com ponto central</figcaption>
+      </figure>
+      <figure>
+        <svg width="170" height="112" viewBox="0 0 170 112">
+          <line x1="6" y1="104" x2="164" y2="104" stroke="#5b6673" stroke-width="1.5"/>
+          <path d="M 15 104 L 155 104 L 15 57 Z" fill="#cbd5e1"/>
+          <rect x="15" y="57" width="140" height="47" fill="none" stroke="#cbd5e1" stroke-width="2"/>
+          <line x1="15" y1="57" x2="155" y2="104" stroke="#cbd5e1" stroke-width="2"/>
+        </svg>
+        <figcaption>Quadro aparente (<code>EL_PANEL_SURFACE</code>) — retângulo 3:1 com triângulo preenchido no canto da parede</figcaption>
+      </figure>
+      <figure>
+        <svg width="170" height="112" viewBox="0 0 170 112">
+          <line x1="6" y1="80" x2="164" y2="80" stroke="#5b6673" stroke-width="1.5"/>
+          <path d="M 15 104 L 155 104 L 15 57 Z" fill="#cbd5e1"/>
+          <rect x="15" y="57" width="140" height="47" fill="none" stroke="#cbd5e1" stroke-width="2"/>
+          <line x1="15" y1="57" x2="155" y2="104" stroke="#cbd5e1" stroke-width="2"/>
+        </svg>
+        <figcaption>Quadro embutido (<code>EL_PANEL_FLUSH</code>) — mesma forma, ~75% recuada para dentro da parede</figcaption>
+      </figure>
+    </div>
+    <div class="note">Estes desenhos são <b>esquemáticos</b> (mão-livre em SVG) para dar a ideia
+    visual — a geometria autoritativa (cantos arredondados das tomadas, preenchimento em leque, os
+    atributos de texto) está em <code>SymbolFactory.cpp</code>, descrita a seguir.</div>
 
     <h2 id="simbolos">Como os símbolos são gerados (SymbolFactory)</h2>
     <span class="filepath">src/services/SymbolFactory.h / .cpp</span>
